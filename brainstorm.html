@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>BRAINSTORM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --surface2: #e8eaee;
+    --border: #d0d4dc;
+    --border-active: #9aa0b4;
+    --accent: #0077cc;
+    --accent2: #6b44e0;
+    --accent3: #e03a3a;
+    --text: #1a1a2e;
+    --text-dim: #5a5a78;
+    --text-dimmer: #a0a4b8;
+    --node-bg: #ffffff;
+    --node-border: #d8dce8;
+    --node-shadow: 0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+    --sticky-yellow: #fffbe6;
+    --sticky-yellow-border: #f0e08a;
+    --toolbar-h: 56px;
+    --radius: 6px;
+    --font-mono: 'DM Mono', monospace;
+    --font-display: 'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-mono);
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100dvh;
+    width: 100dvw;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ── TOOLBAR ── */
+  #toolbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--toolbar-h);
+    background: rgba(240,242,245,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 4px;
+    z-index: 1000;
+  }
+
+  #toolbar .logo {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    margin-right: 8px;
+    padding-right: 12px;
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .tb-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 36px;
+    padding: 0 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tb-btn:hover { background: var(--surface2); border-color: var(--border); color: var(--text); }
+  .tb-btn:active { background: var(--border); }
+  .tb-btn.active { background: rgba(0,229,255,0.08); border-color: rgba(0,229,255,0.3); color: var(--accent); }
+  .tb-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .tb-btn .label { display: none; }
+  @media (min-width: 600px) { .tb-btn .label { display: inline; } }
+
+  .tb-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+
+  .tb-btn.danger:hover { color: var(--accent3); border-color: rgba(255,107,107,0.3); background: rgba(255,107,107,0.05); }
+  .tb-btn.recording { color: var(--accent3); border-color: rgba(255,107,107,0.5); background: rgba(255,107,107,0.1); animation: pulse-red 1s ease infinite; }
+  @keyframes pulse-red { 0%,100%{box-shadow:0 0 0 0 rgba(255,107,107,0.3)} 50%{box-shadow:0 0 0 6px rgba(255,107,107,0)} }
+
+  .tb-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+
+  /* ── CANVAS ── */
+  #canvas-container {
+    position: fixed;
+    top: var(--toolbar-h);
+    left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+    cursor: default;
+  }
+
+  #canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* SVG connections */
+  #svg-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .conn-line {
+    stroke: var(--border-active);
+    stroke-width: 1.5;
+    fill: none;
+    marker-end: url(#arrowhead);
+    transition: stroke 0.2s;
+  }
+  .conn-line:hover { stroke: var(--accent); }
+  .conn-line.selected { stroke: var(--accent); }
+  .conn-line.temp { stroke: var(--accent2); stroke-dasharray: 5 3; opacity: 0.7; }
+
+  /* ── NODES ── */
+  .node {
+    position: absolute;
+    min-width: 120px;
+    max-width: 240px;
+    background: var(--node-bg);
+    border: 1px solid var(--node-border);
+    border-radius: 8px;
+    box-shadow: var(--node-shadow);
+    cursor: grab;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    transform-origin: center center;
+  }
+  .node:active { cursor: grabbing; }
+  .node.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), var(--node-shadow), 0 0 20px rgba(0,229,255,0.15);
+  }
+  .node.connecting-source {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 1px var(--accent2), 0 0 20px rgba(123,97,255,0.3);
+  }
+
+  .node-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px 6px;
+    border-bottom: 1px solid var(--node-border);
+  }
+  .node-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .node.selected .node-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+  .node-color-dot { cursor: pointer; }
+  .node-color-dot:hover { transform: scale(1.3); }
+
+  .node-body {
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    word-break: break-word;
+    white-space: pre-wrap;
+    min-height: 28px;
+  }
+  .node-body[contenteditable="true"] {
+    outline: none;
+    cursor: text;
+  }
+  .node-body[contenteditable="true"]:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-dimmer);
+    font-style: italic;
+  }
+
+  .node-actions {
+    display: flex;
+    padding: 4px 6px;
+    gap: 2px;
+    border-top: 1px solid var(--node-border);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .node:hover .node-actions, .node.selected .node-actions { opacity: 1; }
+
+  .node-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .node-btn:hover { background: var(--surface2); color: var(--text); }
+  .node-btn.connect-btn:hover { color: var(--accent2); }
+  .node-btn.del-btn:hover { color: var(--accent3); }
+  .node-btn svg { width: 13px; height: 13px; }
+
+  /* ── PORT ANCHORS ── */
+  .port {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--border-active);
+    cursor: crosshair;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.15s, transform 0.15s, border-color 0.15s, background 0.15s;
+    transform: scale(0.8);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .node:hover .port,
+  .node.selected .port,
+  .node.connecting-source .port { opacity: 1; transform: scale(1); }
+  .port:hover { background: var(--accent); border-color: var(--accent); transform: scale(1.3) !important; }
+  .port.top    { top: -6px;  left: calc(50% - 6px); }
+  .port.bottom { bottom: -6px; left: calc(50% - 6px); }
+  .port.left   { left: -6px; top: calc(50% - 6px); }
+  .port.right  { right: -6px; top: calc(50% - 6px); }
+  body.connecting .port { opacity: 1; transform: scale(1); }
+  body.connecting .port:hover { background: var(--accent2); border-color: var(--accent2); transform: scale(1.4) !important; }
+
+  /* ── COLOR VARIANTS ── */
+  .node[data-color="cyan"] .node-dot { background: var(--accent); }
+  .node[data-color="purple"] .node-dot { background: var(--accent2); }
+  .node[data-color="red"] .node-dot { background: var(--accent3); }
+  .node[data-color="green"] .node-dot { background: #2d9e5f; }
+  .node[data-color="orange"] .node-dot { background: #d97706; }
+  .node[data-color="cyan"] { border-color: rgba(0,119,204,0.3); }
+  .node[data-color="purple"] { border-color: rgba(107,68,224,0.3); }
+  .node[data-color="red"] { border-color: rgba(224,58,58,0.3); }
+  .node[data-color="green"] { border-color: rgba(45,158,95,0.3); }
+  .node[data-color="orange"] { border-color: rgba(217,119,6,0.3); }
+
+  /* ── STICKY NOTES ── */
+  .sticky {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    background: var(--sticky-yellow);
+    border: 1px solid var(--sticky-yellow-border);
+    border-radius: 4px;
+    box-shadow: var(--node-shadow);
+    cursor: grab;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .sticky:active { cursor: grabbing; }
+  .sticky.selected { border-color: #ffdd00; box-shadow: 0 0 0 1px #ffdd00, var(--node-shadow); }
+
+  .sticky-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    background: rgba(255,220,0,0.05);
+    border-bottom: 1px solid var(--sticky-yellow-border);
+  }
+  .sticky-label {
+    font-size: 10px;
+    color: rgba(160,120,0,0.5);
+    letter-spacing: 0.1em;
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+  .sticky-del {
+    background: transparent; border: none;
+    color: rgba(160,120,0,0.35); cursor: pointer;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .sticky-del:hover { color: var(--accent3); background: rgba(255,107,107,0.1); }
+  .sticky-del svg { width: 11px; height: 11px; }
+
+  .sticky canvas {
+    display: block;
+    width: 100%;
+    height: calc(100% - 33px);
+    touch-action: none;
+    cursor: crosshair;
+  }
+
+  /* ── HANDWRITING OVERLAY ── */
+  #hw-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(230,232,240,0.97);
+    flex-direction: column;
+  }
+  #hw-overlay.active { display: flex; }
+
+  #hw-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #hw-toolbar .hw-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin-right: 8px;
+  }
+
+  .hw-color {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .hw-color.active { border-color: white; transform: scale(1.15); }
+  .hw-color:hover { transform: scale(1.1); }
+
+  .hw-size {
+    display: flex; align-items: center; gap: 4px;
+    margin: 0 4px;
+  }
+  .hw-size input[type=range] {
+    width: 70px; height: 3px;
+    -webkit-appearance: none;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  .hw-size input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  .hw-btn {
+    height: 32px; padding: 0 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .hw-btn:hover { background: var(--surface2); color: var(--text); }
+  .hw-btn.primary {
+    background: rgba(0,229,255,0.1);
+    border-color: rgba(0,229,255,0.4);
+    color: var(--accent);
+  }
+  .hw-btn.primary:hover { background: rgba(0,229,255,0.2); }
+
+  #hw-canvas {
+    flex: 1;
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
+  }
+
+  /* ── CONTEXT MENU ── */
+  #ctx-menu {
+    display: none;
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    z-index: 3000;
+    min-width: 160px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  }
+  #ctx-menu.active { display: block; }
+
+  .ctx-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.1s;
+    border: none; background: none; width: 100%; text-align: left;
+    font-family: var(--font-mono);
+  }
+  .ctx-item:hover { background: var(--surface2); color: var(--text); }
+  .ctx-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .ctx-item.danger:hover { color: var(--accent3); background: rgba(255,107,107,0.07); }
+  .ctx-sep { height: 1px; background: var(--border); margin: 3px 0; }
+
+  /* ── COLOR PICKER POPUP ── */
+  #color-popup {
+    display: none;
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    z-index: 3100;
+    gap: 6px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  }
+  #color-popup.active { display: flex; }
+  .cp-dot {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .cp-dot:hover { transform: scale(1.2); }
+  .cp-dot.active { border-color: white; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+    z-index: 9999;
+    opacity: 0;
+    transition: all 0.25s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── MINIMAP ── */
+  #minimap {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    width: 120px; height: 80px;
+    background: rgba(240,242,245,0.85);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    z-index: 500;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  #minimap:hover { opacity: 1; }
+  #minimap canvas { width: 100%; height: 100%; }
+
+  /* ── ZOOM INDICATOR ── */
+  #zoom-indicator {
+    position: fixed;
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--text-dimmer);
+    background: rgba(240,242,245,0.85);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    z-index: 500;
+    pointer-events: none;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+    transition: opacity 0.5s;
+    opacity: 0;
+  }
+  #zoom-indicator.show { opacity: 1; }
+
+  /* ── IMPORT HIDDEN ── */
+  #import-input { display: none; }
+
+  /* ── GRID BG ── */
+  #canvas-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(160,164,184,0.25) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(160,164,184,0.25) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #canvas { z-index: 1; }
+
+  /* Connecting mode cursor */
+  body.connecting #canvas-container { cursor: crosshair; }
+
+  /* ── Node appear animation ── */
+  @keyframes node-in {
+    from { opacity: 0; transform: scale(0.85); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .node, .sticky { animation: node-in 0.18s cubic-bezier(0.34,1.56,0.64,1); }
+
+</style>
+</head>
+<body>
+
+<!-- TOOLBAR -->
+<div id="toolbar">
+  <span class="logo">BST</span>
+
+  <button class="tb-btn" id="btn-add-node" title="新增節點 (雙擊畫布)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    <span class="label">節點</span>
+  </button>
+
+  <button class="tb-btn" id="btn-voice" title="語音輸入節點">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    <span class="label">語音</span>
+  </button>
+
+  <button class="tb-btn" id="btn-sticky" title="新增手寫便利貼">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <span class="label">便利貼</span>
+  </button>
+
+  <div class="tb-sep"></div>
+
+  <button class="tb-btn" id="btn-undo" title="復原 (Ctrl+Z)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+    <span class="label">復原</span>
+  </button>
+
+  <button class="tb-btn" id="btn-redo" title="重做 (Ctrl+Y)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+    <span class="label">重做</span>
+  </button>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-right">
+    <button class="tb-btn" id="btn-fit" title="全部顯示">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    </button>
+    <button class="tb-btn" id="btn-save" title="存檔至本機">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      <span class="label">存檔</span>
+    </button>
+    <button class="tb-btn" id="btn-export-md" title="匯出 Markdown">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="label">MD</span>
+    </button>
+    <button class="tb-btn" id="btn-import" title="匯入 Markdown / JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span class="label">匯入</span>
+    </button>
+    <button class="tb-btn danger" id="btn-clear" title="清空畫布">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- CANVAS -->
+<div id="canvas-container">
+  <div id="canvas">
+    <svg id="svg-layer">
+      <defs>
+        <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#9aa0b4"/>
+        </marker>
+        <marker id="arrowhead-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#0077cc"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+</div>
+
+<!-- ZOOM INDICATOR -->
+<div id="zoom-indicator">100%</div>
+
+<!-- MINIMAP -->
+<div id="minimap"><canvas id="minimap-canvas"></canvas></div>
+
+<!-- HANDWRITING OVERLAY -->
+<div id="hw-overlay">
+  <div id="hw-toolbar">
+    <span class="hw-title">手寫記錄</span>
+    <div class="hw-color active" style="background:#1a1a2e" data-color="#1a1a2e"></div>
+    <div class="hw-color" style="background:#0077cc" data-color="#0077cc"></div>
+    <div class="hw-color" style="background:#e03a3a" data-color="#e03a3a"></div>
+    <div class="hw-color" style="background:#2d9e5f" data-color="#2d9e5f"></div>
+    <div class="hw-color" style="background:#d97706" data-color="#d97706"></div>
+    <div class="hw-color" style="background:#6b44e0" data-color="#6b44e0"></div>
+    <div class="hw-size">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="color:var(--text-dimmer)"><circle cx="12" cy="12" r="4"/></svg>
+      <input type="range" id="hw-brush-size" min="1" max="20" value="3">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color:var(--text-dim)"><circle cx="12" cy="12" r="8"/></svg>
+    </div>
+    <button class="hw-btn" id="hw-eraser" title="橡皮擦">橡皮擦</button>
+    <button class="hw-btn" id="hw-clear">清除</button>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button class="hw-btn" id="hw-cancel">取消</button>
+      <button class="hw-btn primary" id="hw-confirm">貼上</button>
+    </div>
+  </div>
+  <canvas id="hw-canvas"></canvas>
+</div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx-menu">
+  <button class="ctx-item" id="ctx-add-node">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    新增節點
+  </button>
+  <button class="ctx-item" id="ctx-add-sticky">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    新增便利貼
+  </button>
+  <div class="ctx-sep"></div>
+  <button class="ctx-item danger" id="ctx-clear">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    清空畫布
+  </button>
+</div>
+
+<!-- COLOR POPUP -->
+<div id="color-popup">
+  <div class="cp-dot active" data-color="cyan" style="background:#0077cc"></div>
+  <div class="cp-dot" data-color="purple" style="background:#6b44e0"></div>
+  <div class="cp-dot" data-color="red" style="background:#e03a3a"></div>
+  <div class="cp-dot" data-color="green" style="background:#2d9e5f"></div>
+  <div class="cp-dot" data-color="orange" style="background:#d97706"></div>
+</div>
+
+<input type="file" id="import-input" accept=".md,.json">
+
+<div id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────
+const state = {
+  nodes: [],      // {id, x, y, text, color}
+  stickies: [],   // {id, x, y, dataURL}
+  connections: [] // {id, from, to}
+};
+
+let nextId = 1;
+const genId = () => `id_${nextId++}`;
+
+// Viewport transform
+let vx = 0, vy = 0, vscale = 1;
+
+// History
+const history = [];
+let histIdx = -1;
+const MAX_HIST = 60;
+
+// UI state
+let connectingFrom = null; // node id being connected
+let selectedIds = new Set();
+let contextPos = {x:0, y:0}; // canvas coords for context menu
+let colorTargetId = null;
+
+// ── DOM REFS ──────────────────────────────────────────────────────────
+const canvasEl = document.getElementById('canvas');
+const svgLayer = document.getElementById('svg-layer');
+const container = document.getElementById('canvas-container');
+const zoomInd = document.getElementById('zoom-indicator');
+let zoomTimer = null;
+
+// ── TRANSFORM HELPERS ─────────────────────────────────────────────────
+function applyTransform() {
+  canvasEl.style.transform = `translate(${vx}px,${vy}px) scale(${vscale})`;
+  canvasEl.style.transformOrigin = '0 0';
+  updateConnections();
+  updateMinimap();
+  showZoom();
+}
+
+function screenToCanvas(sx, sy) {
+  return { x: (sx - vx) / vscale, y: (sy - vy) / vscale };
+}
+
+function showZoom() {
+  zoomInd.textContent = Math.round(vscale * 100) + '%';
+  zoomInd.classList.add('show');
+  clearTimeout(zoomTimer);
+  zoomTimer = setTimeout(() => zoomInd.classList.remove('show'), 1500);
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────────
+function snapshot() {
+  const s = JSON.stringify({nodes: state.nodes, stickies: state.stickies, connections: state.connections});
+  history.splice(histIdx + 1);
+  history.push(s);
+  if (history.length > MAX_HIST) history.shift();
+  histIdx = history.length - 1;
+  updateUndoRedo();
+}
+
+function updateUndoRedo() {
+  document.getElementById('btn-undo').style.opacity = histIdx > 0 ? '1' : '0.35';
+  document.getElementById('btn-redo').style.opacity = histIdx < history.length - 1 ? '1' : '0.35';
+}
+
+function undo() {
+  if (histIdx <= 0) return;
+  histIdx--;
+  restoreSnapshot(history[histIdx]);
+}
+
+function redo() {
+  if (histIdx >= history.length - 1) return;
+  histIdx++;
+  restoreSnapshot(history[histIdx]);
+}
+
+function restoreSnapshot(s) {
+  const saved = JSON.parse(s);
+  state.nodes = saved.nodes;
+  state.stickies = saved.stickies;
+  state.connections = saved.connections;
+  selectedIds.clear();
+  connectingFrom = null;
+  rebuildDOM();
+  updateUndoRedo();
+}
+
+// ── NODE DOM ──────────────────────────────────────────────────────────
+function rebuildDOM() {
+  // Remove all nodes & stickies, rebuild
+  canvasEl.querySelectorAll('.node,.sticky').forEach(el => el.remove());
+  svgLayer.querySelectorAll('.conn-line').forEach(el => el.remove());
+  state.nodes.forEach(n => createNodeDOM(n));
+  state.stickies.forEach(s => createStickyDOM(s));
+  state.connections.forEach(c => createConnLine(c));
+  updateMinimap();
+}
+
+const nodeColors = {
+  cyan:   'var(--accent)',
+  purple: 'var(--accent2)',
+  red:    'var(--accent3)',
+  green:  '#00ff88',
+  orange: '#ff9f43'
+};
+
+function createNodeDOM(n) {
+  const el = document.createElement('div');
+  el.className = 'node';
+  el.dataset.id = n.id;
+  el.dataset.color = n.color || 'cyan';
+  el.style.left = n.x + 'px';
+  el.style.top  = n.y + 'px';
+  el.innerHTML = `
+    <div class="port top"    data-port="top"></div>
+    <div class="port bottom" data-port="bottom"></div>
+    <div class="port left"   data-port="left"></div>
+    <div class="port right"  data-port="right"></div>
+    <div class="node-header">
+      <div class="node-dot node-color-dot" title="更換顏色"></div>
+      <span style="font-size:9px;color:var(--text-dimmer);letter-spacing:.08em;font-family:var(--font-display);font-weight:600;flex:1;">NODE</span>
+    </div>
+    <div class="node-body" contenteditable="false" data-placeholder="輸入內容…">${escHtml(n.text)}</div>
+    <div class="node-actions">
+      <button class="node-btn edit-btn" title="編輯文字">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <button class="node-btn del-btn" title="刪除節點">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `;
+
+  attachNodeEvents(el, n);
+  canvasEl.appendChild(el);
+  return el;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function attachNodeEvents(el, n) {
+  let dragging = false, dragStartX, dragStartY, origX, origY;
+  let pointerDownTime, pointerDownPos;
+  let longPressTimer;
+
+  el.addEventListener('pointerdown', e => {
+    if (e.target.closest('.node-actions') || e.target.closest('[contenteditable="true"]')) return;
+    if (e.target.classList.contains('port')) return;
+
+    pointerDownTime = Date.now();
+    pointerDownPos = {x: e.clientX, y: e.clientY};
+
+    // In connect mode: tapping node body auto-picks best port
+    if (connectingFrom && connectingFrom !== n.id) {
+      const fromEl = document.querySelector(`.node[data-id="${connectingFrom}"]`);
+      const fromPort = connectingFromPort || 'right';
+      const fp = fromEl ? getPortPos(fromEl, fromPort) : {x: 0, y: 0};
+      const toPort = bestTargetPort(fp, el);
+      const exists = state.connections.find(c =>
+        c.from === connectingFrom && c.to === n.id &&
+        c.fromPort === fromPort && c.toPort === toPort
+      );
+      if (!exists) {
+        const conn = {id: genId(), from: connectingFrom, to: n.id, fromPort, toPort};
+        state.connections.push(conn);
+        createConnLine(conn);
+        snapshot();
+        showToast('連結已建立');
+      }
+      cancelConnecting();
+      return;
+    }
+    if (connectingFrom) { cancelConnecting(); return; }
+
+    el.setPointerCapture(e.pointerId);
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    origX = n.x; origY = n.y;
+
+    longPressTimer = setTimeout(() => {
+      // long press = select + connect mode
+    }, 500);
+
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+  });
+
+  function onMove(e) {
+    const dx = (e.clientX - dragStartX) / vscale;
+    const dy = (e.clientY - dragStartY) / vscale;
+    if (!dragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+      dragging = true;
+      clearTimeout(longPressTimer);
+      selectNode(n.id);
+    }
+    if (dragging) {
+      n.x = origX + dx;
+      n.y = origY + dy;
+      el.style.left = n.x + 'px';
+      el.style.top  = n.y + 'px';
+      updateConnections();
+      updateMinimap();
+    }
+  }
+
+  function onUp(e) {
+    el.removeEventListener('pointermove', onMove);
+    el.removeEventListener('pointerup', onUp);
+    clearTimeout(longPressTimer);
+    if (dragging) { dragging = false; snapshot(); return; }
+    // tap
+    if (Date.now() - pointerDownTime < 300) {
+      selectNode(n.id);
+    }
+  }
+
+  // Double tap to edit
+  let lastTap = 0;
+  el.addEventListener('pointerup', () => {
+    const now = Date.now();
+    if (now - lastTap < 300) startEdit(el, n);
+    lastTap = now;
+  });
+
+  // Port anchors — pointer capture drag model
+  // pointerdown on port → capture → drag shows preview → pointerup checks hit target
+  el.querySelectorAll('.port').forEach(portEl => {
+    portEl.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      e.preventDefault();
+      const fromPort = portEl.dataset.port;
+
+      // If already connecting FROM another node, complete TO this port
+      if (connectingFrom && connectingFrom !== n.id) {
+        const exists = state.connections.find(c =>
+          c.from === connectingFrom && c.to === n.id &&
+          c.fromPort === connectingFromPort && c.toPort === fromPort
+        );
+        if (!exists) {
+          const conn = { id: genId(), from: connectingFrom, to: n.id, fromPort: connectingFromPort, toPort: fromPort };
+          state.connections.push(conn);
+          createConnLine(conn);
+          snapshot();
+          showToast('連結已建立');
+        }
+        cancelConnecting();
+        return;
+      }
+
+      // Start drag-to-connect with pointer capture on the port
+      startConnectingFromPort(n.id, fromPort);
+      portEl.setPointerCapture(e.pointerId);
+
+      // Highlight this port
+      portEl.style.background = 'var(--accent2)';
+      portEl.style.borderColor = 'var(--accent2)';
+
+      // Track hovering target port for visual feedback
+      let hoverPortEl = null;
+
+      const onMove = (ev) => {
+        const fromEl2 = document.querySelector(`.node[data-id="${n.id}"]`);
+        if (!fromEl2) return;
+        const fp = getPortPos(fromEl2, fromPort);
+        const cp = screenToCanvas(ev.clientX, ev.clientY);
+
+        // Update temp line
+        if (!tempLine) {
+          tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          tempLine.className.baseVal = 'conn-line temp';
+          svgLayer.appendChild(tempLine);
+        }
+
+        // Check if hovering a target port
+        const hit = hitTestPort(ev.clientX, ev.clientY);
+        const validHit = hit && hit.nodeId !== n.id;
+
+        // Clear previous hover
+        if (hoverPortEl && hoverPortEl !== portEl) {
+          hoverPortEl.style.background = '';
+          hoverPortEl.style.borderColor = '';
+          hoverPortEl.style.transform = '';
+          hoverPortEl = null;
+        }
+
+        if (validHit) {
+          // Snap line to target port
+          const toEl2 = document.querySelector(`.node[data-id="${hit.nodeId}"]`);
+          if (toEl2) {
+            const tp = getPortPos(toEl2, hit.port);
+            tempLine.setAttribute('d', bezierPath(fp.x, fp.y, fromPort, tp.x, tp.y, hit.port));
+          }
+          // Highlight target port
+          hit.portEl.style.background = 'var(--accent2)';
+          hit.portEl.style.borderColor = 'var(--accent2)';
+          hit.portEl.style.transform = 'scale(1.4)';
+          hoverPortEl = hit.portEl;
+        } else {
+          // Free-draw to cursor
+          // Auto-pick incoming port direction
+          const autoToPort = autoIncomingPort(fromPort, fp, cp);
+          tempLine.setAttribute('d', bezierPath(fp.x, fp.y, fromPort, cp.x, cp.y, autoToPort));
+        }
+      };
+
+      const onUp = (ev) => {
+        portEl.removeEventListener('pointermove', onMove);
+        portEl.removeEventListener('pointerup', onUp);
+        portEl.style.background = '';
+        portEl.style.borderColor = '';
+
+        // Clear hover highlight
+        if (hoverPortEl && hoverPortEl !== portEl) {
+          hoverPortEl.style.background = '';
+          hoverPortEl.style.borderColor = '';
+          hoverPortEl.style.transform = '';
+        }
+
+        const hit = hitTestPort(ev.clientX, ev.clientY);
+        const validHit = hit && hit.nodeId && hit.nodeId !== n.id;
+
+        if (validHit) {
+          const exists = state.connections.find(c =>
+            c.from === n.id && c.to === hit.nodeId &&
+            c.fromPort === fromPort && c.toPort === hit.port
+          );
+          if (!exists) {
+            const conn = { id: genId(), from: n.id, to: hit.nodeId, fromPort, toPort: hit.port };
+            state.connections.push(conn);
+            createConnLine(conn);
+            snapshot();
+            showToast('連結已建立');
+          }
+          cancelConnecting();
+        } else {
+          // Released on empty space → keep connect mode active for tap-to-connect
+          if (tempLine) { tempLine.remove(); tempLine = null; }
+          showToast('點擊目標節點的連接點完成連結 · 點空白取消');
+        }
+      };
+
+      portEl.addEventListener('pointermove', onMove);
+      portEl.addEventListener('pointerup', onUp);
+    });
+  });
+
+  el.querySelector('.edit-btn').addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    startEdit(el, n);
+  });
+
+  el.querySelector('.del-btn').addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    deleteNode(n.id);
+  });
+
+  el.querySelector('.node-color-dot').addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    showColorPopup(n.id, e.clientX, e.clientY);
+  });
+}
+
+function selectNode(id) {
+  selectedIds.clear();
+  selectedIds.add(id);
+  document.querySelectorAll('.node').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === id);
+  });
+}
+
+function deselectAll() {
+  selectedIds.clear();
+  document.querySelectorAll('.node').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.sticky').forEach(el => el.classList.remove('selected'));
+  cancelConnecting();
+  hideCtxMenu();
+  hideColorPopup();
+}
+
+function startEdit(el, n) {
+  const body = el.querySelector('.node-body');
+  body.contentEditable = 'true';
+  body.focus();
+  const range = document.createRange();
+  range.selectNodeContents(body);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  const finish = () => {
+    body.contentEditable = 'false';
+    n.text = body.innerText.trim();
+    snapshot();
+  };
+  body.addEventListener('blur', finish, {once: true});
+  body.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); body.blur(); }
+    if (e.key === 'Escape') { body.blur(); }
+  });
+}
+
+function deleteNode(id) {
+  state.nodes = state.nodes.filter(n => n.id !== id);
+  state.connections = state.connections.filter(c => c.from !== id && c.to !== id);
+  document.querySelector(`.node[data-id="${id}"]`)?.remove();
+  svgLayer.querySelectorAll('.conn-line').forEach(el => el.remove());
+  state.connections.forEach(c => createConnLine(c));
+  snapshot();
+}
+
+// ── CONNECTION ────────────────────────────────────────────────────────
+let tempLine = null;
+let connectingFromPort = null; // 'top'|'bottom'|'left'|'right'
+
+// Get the canvas-space coordinate of a port on a node element
+function getPortPos(el, port) {
+  const rect = el.getBoundingClientRect();
+  let sx, sy;
+  switch (port) {
+    case 'top':    sx = rect.left + rect.width / 2;  sy = rect.top;                   break;
+    case 'bottom': sx = rect.left + rect.width / 2;  sy = rect.bottom;                break;
+    case 'left':   sx = rect.left;                    sy = rect.top + rect.height / 2; break;
+    case 'right':  sx = rect.right;                   sy = rect.top + rect.height / 2; break;
+    default:       sx = rect.left + rect.width / 2;  sy = rect.top + rect.height / 2;
+  }
+  return { x: (sx - vx) / vscale, y: (sy - vy) / vscale };
+}
+
+// Choose best receiving port on target node given source canvas position
+function bestTargetPort(fromCanvasPos, toEl) {
+  const rect = toEl.getBoundingClientRect();
+  const cx = ((rect.left + rect.right) / 2 - vx) / vscale;
+  const cy = ((rect.top + rect.bottom) / 2 - vy) / vscale;
+  const dx = cx - fromCanvasPos.x;
+  const dy = cy - fromCanvasPos.y;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'left' : 'right';
+  else return dy > 0 ? 'top' : 'bottom';
+}
+
+// Find which node + port is under a screen position
+function hitTestPort(screenX, screenY) {
+  // Use elementFromPoint but look for .port elements
+  // We check all ports of all nodes for proximity
+  let best = null, bestDist = 24; // px threshold
+  document.querySelectorAll('.port').forEach(portEl => {
+    const rect = portEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top  + rect.height / 2;
+    const dist = Math.sqrt((screenX - cx) ** 2 + (screenY - cy) ** 2);
+    if (dist < bestDist) {
+      bestDist = dist;
+      const nodeEl = portEl.closest('.node');
+      best = { nodeId: nodeEl?.dataset.id, port: portEl.dataset.port, portEl };
+    }
+  });
+  return best;
+}
+
+function startConnectingFromPort(fromId, fromPort) {
+  connectingFrom = fromId;
+  connectingFromPort = fromPort;
+  document.body.classList.add('connecting');
+  const fromEl = document.querySelector(`.node[data-id="${fromId}"]`);
+  if (fromEl) fromEl.classList.add('connecting-source');
+  showToast('拖曳到目標節點的連接點 · 鬆開即連結');
+}
+
+function cancelConnecting() {
+  connectingFrom = null;
+  connectingFromPort = null;
+  document.body.classList.remove('connecting');
+  document.querySelectorAll('.node').forEach(el => el.classList.remove('connecting-source'));
+  if (tempLine) { tempLine.remove(); tempLine = null; }
+}
+
+// When free-drawing, pick a sensible incoming direction for the temp line endpoint
+function autoIncomingPort(fromPort, fromPos, cursorPos) {
+  const dx = cursorPos.x - fromPos.x;
+  const dy = cursorPos.y - fromPos.y;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'left' : 'right';
+  return dy > 0 ? 'top' : 'bottom';
+}
+
+// Bezier with port-aware control points
+function bezierPath(x1, y1, fromPort, x2, y2, toPort) {
+  const dist = Math.max(50, Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) * 0.45);
+  let c1x = x1, c1y = y1, c2x = x2, c2y = y2;
+  switch (fromPort) {
+    case 'top':    c1y -= dist; break;
+    case 'bottom': c1y += dist; break;
+    case 'left':   c1x -= dist; break;
+    case 'right':  c1x += dist; break;
+    default:       c1x += dist;
+  }
+  switch (toPort) {
+    case 'top':    c2y -= dist; break;
+    case 'bottom': c2y += dist; break;
+    case 'left':   c2x -= dist; break;
+    case 'right':  c2x += dist; break;
+    default:       c2x -= dist;
+  }
+  return `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
+}
+
+function createConnLine(conn) {
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.className.baseVal = 'conn-line';
+  path.dataset.connId = conn.id;
+  path.style.pointerEvents = 'stroke';
+  path.style.cursor = 'pointer';
+  svgLayer.appendChild(path);
+  path.addEventListener('dblclick', () => {
+    state.connections = state.connections.filter(c => c.id !== conn.id);
+    path.remove();
+    snapshot();
+  });
+  updateConnLine(path, conn);
+  return path;
+}
+
+function updateConnLine(path, conn) {
+  const fromEl = document.querySelector(`.node[data-id="${conn.from}"]`);
+  const toEl   = document.querySelector(`.node[data-id="${conn.to}"]`);
+  if (!fromEl || !toEl) { path.style.display = 'none'; return; }
+  path.style.display = '';
+  const fromPort = conn.fromPort || 'right';
+  const toPort   = conn.toPort   || 'left';
+  const fp = getPortPos(fromEl, fromPort);
+  const tp = getPortPos(toEl, toPort);
+  path.setAttribute('d', bezierPath(fp.x, fp.y, fromPort, tp.x, tp.y, toPort));
+}
+
+function updateConnections() {
+  state.connections.forEach(conn => {
+    const path = svgLayer.querySelector(`[data-conn-id="${conn.id}"]`);
+    if (path) updateConnLine(path, conn);
+  });
+}
+
+// ── STICKY ────────────────────────────────────────────────────────────
+function createStickyDOM(s) {
+  const el = document.createElement('div');
+  el.className = 'sticky';
+  el.dataset.id = s.id;
+  el.style.left = s.x + 'px';
+  el.style.top  = s.y + 'px';
+  el.innerHTML = `
+    <div class="sticky-header">
+      <span class="sticky-label">MEMO</span>
+      <button class="sticky-del">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <canvas width="400" height="334"></canvas>
+  `;
+
+  const cvs = el.querySelector('canvas');
+  const ctx2 = cvs.getContext('2d');
+  if (s.dataURL) {
+    const img = new Image();
+    img.onload = () => ctx2.drawImage(img, 0, 0);
+    img.src = s.dataURL;
+  }
+
+  // Delete
+  el.querySelector('.sticky-del').addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    state.stickies = state.stickies.filter(st => st.id !== s.id);
+    el.remove();
+    snapshot();
+  });
+
+  // Drag
+  attachDragEvents(el, s);
+  canvasEl.appendChild(el);
+  return el;
+}
+
+function attachDragEvents(el, item) {
+  let dragging = false, dragStartX, dragStartY, origX, origY;
+  el.addEventListener('pointerdown', e => {
+    if (e.target.tagName === 'CANVAS' || e.target.tagName === 'BUTTON') return;
+    el.setPointerCapture(e.pointerId);
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    origX = item.x; origY = item.y;
+
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+  });
+  function onMove(e) {
+    const dx = (e.clientX - dragStartX) / vscale;
+    const dy = (e.clientY - dragStartY) / vscale;
+    if (!dragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) dragging = true;
+    if (dragging) {
+      item.x = origX + dx; item.y = origY + dy;
+      el.style.left = item.x + 'px';
+      el.style.top  = item.y + 'px';
+      updateMinimap();
+    }
+  }
+  function onUp() {
+    el.removeEventListener('pointermove', onMove);
+    el.removeEventListener('pointerup', onUp);
+    if (dragging) { dragging = false; snapshot(); }
+  }
+}
+
+// ── HANDWRITING OVERLAY ───────────────────────────────────────────────
+const hwOverlay = document.getElementById('hw-overlay');
+const hwCanvas  = document.getElementById('hw-canvas');
+const hwCtx     = hwCanvas.getContext('2d');
+let hwColor = '#1a1a2e';
+let hwSize  = 3;
+let hwEraser = false;
+let hwDrawing = false;
+let hwTargetId = null; // sticky id to update
+
+function openHWOverlay(stickyId = null) {
+  hwTargetId = stickyId;
+  hwCanvas.width  = window.innerWidth;
+  hwCanvas.height = window.innerHeight - 60;
+  hwCtx.fillStyle = '#f5f6fa';
+  hwCtx.fillRect(0, 0, hwCanvas.width, hwCanvas.height);
+
+  // If editing existing sticky, load its content
+  if (stickyId) {
+    const sticky = state.stickies.find(s => s.id === stickyId);
+    if (sticky?.dataURL) {
+      const img = new Image();
+      img.onload = () => hwCtx.drawImage(img, 0, 0, hwCanvas.width, hwCanvas.height);
+      img.src = sticky.dataURL;
+    }
+  }
+
+  hwOverlay.classList.add('active');
+}
+
+document.querySelectorAll('.hw-color').forEach(btn => {
+  btn.addEventListener('pointerdown', () => {
+    document.querySelectorAll('.hw-color').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    hwColor = btn.dataset.color;
+    hwEraser = false;
+    document.getElementById('hw-eraser').style.background = '';
+    document.getElementById('hw-eraser').style.color = '';
+  });
+});
+
+document.getElementById('hw-brush-size').addEventListener('input', e => {
+  hwSize = parseInt(e.target.value);
+});
+
+document.getElementById('hw-eraser').addEventListener('pointerdown', () => {
+  hwEraser = !hwEraser;
+  const btn = document.getElementById('hw-eraser');
+  btn.style.background = hwEraser ? 'rgba(0,229,255,0.1)' : '';
+  btn.style.color = hwEraser ? 'var(--accent)' : '';
+});
+
+document.getElementById('hw-clear').addEventListener('pointerdown', () => {
+  hwCtx.fillStyle = '#0a0a0f';
+  hwCtx.fillRect(0, 0, hwCanvas.width, hwCanvas.height);
+});
+
+hwCanvas.addEventListener('pointerdown', e => {
+  hwDrawing = true;
+  hwCtx.beginPath();
+  hwCtx.moveTo(e.offsetX, e.offsetY);
+  hwCanvas.setPointerCapture(e.pointerId);
+});
+hwCanvas.addEventListener('pointermove', e => {
+  if (!hwDrawing) return;
+  if (hwEraser) {
+    hwCtx.clearRect(e.offsetX - hwSize*3, e.offsetY - hwSize*3, hwSize*6, hwSize*6);
+    return;
+  }
+  hwCtx.lineWidth = hwSize;
+  hwCtx.lineCap = 'round';
+  hwCtx.lineJoin = 'round';
+  hwCtx.strokeStyle = hwColor;
+  hwCtx.lineTo(e.offsetX, e.offsetY);
+  hwCtx.stroke();
+  hwCtx.beginPath();
+  hwCtx.moveTo(e.offsetX, e.offsetY);
+});
+hwCanvas.addEventListener('pointerup', () => { hwDrawing = false; });
+
+document.getElementById('hw-cancel').addEventListener('pointerdown', () => {
+  hwOverlay.classList.remove('active');
+});
+
+document.getElementById('hw-confirm').addEventListener('pointerdown', () => {
+  const dataURL = hwCanvas.toDataURL('image/png');
+  if (hwTargetId) {
+    // update existing sticky
+    const sticky = state.stickies.find(s => s.id === hwTargetId);
+    if (sticky) {
+      sticky.dataURL = dataURL;
+      const stickyEl = canvasEl.querySelector(`.sticky[data-id="${hwTargetId}"]`);
+      if (stickyEl) {
+        const cvs = stickyEl.querySelector('canvas');
+        const ctx2 = cvs.getContext('2d');
+        ctx2.clearRect(0,0,cvs.width,cvs.height);
+        const img = new Image();
+        img.onload = () => ctx2.drawImage(img,0,0,cvs.width,cvs.height);
+        img.src = dataURL;
+      }
+    }
+  } else {
+    // new sticky
+    const cp = screenToCanvas(window.innerWidth/2 - 100, (window.innerHeight - 60)/2 - 100);
+    const sticky = {id: genId(), x: cp.x, y: cp.y, dataURL};
+    state.stickies.push(sticky);
+    createStickyDOM(sticky);
+  }
+  snapshot();
+  hwOverlay.classList.remove('active');
+  showToast('便利貼已貼上');
+});
+
+// Double tap sticky to edit
+canvasEl.addEventListener('dblclick', e => {
+  const stickyEl = e.target.closest('.sticky');
+  if (stickyEl) openHWOverlay(stickyEl.dataset.id);
+});
+
+// ── VIEWPORT PAN & ZOOM ───────────────────────────────────────────────
+let panning = false, panStartX, panStartY, panOrigX, panOrigY;
+let pinchDist = 0, pinchScale0, pinchVx0, pinchVy0;
+
+container.addEventListener('pointerdown', e => {
+  if (e.target !== container && e.target !== canvasEl && !e.target.closest('#svg-layer')) return;
+  if (connectingFrom) { cancelConnecting(); return; }
+  deselectAll();
+  hideCtxMenu(); hideColorPopup();
+
+  panning = true;
+  container.setPointerCapture(e.pointerId);
+  panStartX = e.clientX; panStartY = e.clientY;
+  panOrigX = vx; panOrigY = vy;
+});
+
+container.addEventListener('pointermove', e => {
+  if (!panning) return;
+  vx = panOrigX + (e.clientX - panStartX);
+  vy = panOrigY + (e.clientY - panStartY);
+  applyTransform();
+});
+
+container.addEventListener('pointerup', () => { panning = false; });
+
+// Double tap on canvas to add node
+let lastCanvasTap = 0;
+container.addEventListener('pointerup', e => {
+  if (e.target !== container && e.target !== canvasEl) return;
+  // Cancel connecting if tapping empty canvas
+  if (connectingFrom) { cancelConnecting(); return; }
+  const now = Date.now();
+  if (now - lastCanvasTap < 300) {
+    const cp = screenToCanvas(e.clientX, e.clientY);
+    addNode(cp.x - 60, cp.y - 20);
+  }
+  lastCanvasTap = now;
+});
+
+// Long press for context menu
+let ctxTimer;
+container.addEventListener('pointerdown', e => {
+  if (e.target !== container && e.target !== canvasEl) return;
+  ctxTimer = setTimeout(() => {
+    const cp = screenToCanvas(e.clientX, e.clientY);
+    contextPos = cp;
+    showCtxMenu(e.clientX, e.clientY);
+  }, 600);
+});
+container.addEventListener('pointermove', () => clearTimeout(ctxTimer));
+container.addEventListener('pointerup', () => clearTimeout(ctxTimer));
+
+container.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const cp = screenToCanvas(e.clientX, e.clientY);
+  contextPos = cp;
+  showCtxMenu(e.clientX, e.clientY);
+});
+
+// Pinch zoom (touch)
+let activePointers = new Map();
+container.addEventListener('pointerdown', e => {
+  activePointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+});
+container.addEventListener('pointermove', e => {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (activePointers.size === 2) {
+    panning = false;
+    const pts = [...activePointers.values()];
+    const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (!pinchDist) { pinchDist = dist; pinchScale0 = vscale; pinchVx0 = vx; pinchVy0 = vy; }
+    const ratio = dist / pinchDist;
+    const cx = (pts[0].x + pts[1].x) / 2;
+    const cy = (pts[0].y + pts[1].y) / 2;
+    const newScale = Math.min(3, Math.max(0.15, pinchScale0 * ratio));
+    vx = cx - (cx - pinchVx0) * (newScale / pinchScale0);
+    vy = cy - (cy - pinchVy0) * (newScale / pinchScale0);
+    vscale = newScale;
+    applyTransform();
+  }
+});
+container.addEventListener('pointerup', e => {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) pinchDist = 0;
+});
+container.addEventListener('pointercancel', e => {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) pinchDist = 0;
+});
+
+// Mouse wheel zoom
+container.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  const newScale = Math.min(3, Math.max(0.15, vscale * delta));
+  vx = e.clientX - (e.clientX - vx) * (newScale / vscale);
+  vy = e.clientY - (e.clientY - vy) * (newScale / vscale);
+  vscale = newScale;
+  applyTransform();
+}, {passive: false});
+
+// ── ADD NODE ─────────────────────────────────────────────────────────
+function addNode(x, y, text = '') {
+  const node = {id: genId(), x, y, text, color: 'cyan'};
+  state.nodes.push(node);
+  const el = createNodeDOM(node);
+  snapshot();
+  if (!text) setTimeout(() => startEdit(el, node), 50);
+  return node;
+}
+
+// ── VOICE INPUT ──────────────────────────────────────────────────────
+let recognition = null;
+let voiceBtn = document.getElementById('btn-voice');
+
+if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'zh-TW';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = e => {
+    const text = e.results[0][0].transcript.trim();
+    if (text) {
+      const cp = screenToCanvas(window.innerWidth/2, window.innerHeight/2);
+      addNode(cp.x - 60, cp.y - 20 + (state.nodes.length % 5) * 80, text);
+      showToast('✓ ' + text);
+    }
+    voiceBtn.classList.remove('recording');
+  };
+  recognition.onerror = () => voiceBtn.classList.remove('recording');
+  recognition.onend = () => voiceBtn.classList.remove('recording');
+
+  voiceBtn.addEventListener('pointerdown', () => {
+    if (voiceBtn.classList.contains('recording')) {
+      recognition.stop();
+      voiceBtn.classList.remove('recording');
+    } else {
+      recognition.lang = 'zh-TW';
+      recognition.start();
+      voiceBtn.classList.add('recording');
+      showToast('聆聽中… 說話後自動停止');
+    }
+  });
+} else {
+  voiceBtn.title = '此瀏覽器不支援語音輸入';
+  voiceBtn.style.opacity = '0.4';
+}
+
+// ── CONTEXT MENU ─────────────────────────────────────────────────────
+const ctxMenu = document.getElementById('ctx-menu');
+
+function showCtxMenu(sx, sy) {
+  ctxMenu.style.left = sx + 'px';
+  ctxMenu.style.top  = sy + 'px';
+  ctxMenu.classList.add('active');
+}
+function hideCtxMenu() { ctxMenu.classList.remove('active'); }
+
+document.getElementById('ctx-add-node').addEventListener('pointerdown', () => {
+  hideCtxMenu();
+  addNode(contextPos.x - 60, contextPos.y - 20);
+});
+document.getElementById('ctx-add-sticky').addEventListener('pointerdown', () => {
+  hideCtxMenu();
+  openHWOverlay(null);
+});
+document.getElementById('ctx-clear').addEventListener('pointerdown', () => {
+  hideCtxMenu();
+  clearCanvas();
+});
+
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('#ctx-menu')) hideCtxMenu();
+});
+
+// ── COLOR POPUP ───────────────────────────────────────────────────────
+const colorPopup = document.getElementById('color-popup');
+
+function showColorPopup(nodeId, sx, sy) {
+  colorTargetId = nodeId;
+  colorPopup.style.left = sx + 'px';
+  colorPopup.style.top  = (sy + 10) + 'px';
+  colorPopup.classList.add('active');
+  const n = state.nodes.find(n => n.id === nodeId);
+  colorPopup.querySelectorAll('.cp-dot').forEach(d => {
+    d.classList.toggle('active', d.dataset.color === (n?.color || 'cyan'));
+  });
+}
+function hideColorPopup() { colorPopup.classList.remove('active'); colorTargetId = null; }
+
+colorPopup.querySelectorAll('.cp-dot').forEach(dot => {
+  dot.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    if (!colorTargetId) return;
+    const n = state.nodes.find(n => n.id === colorTargetId);
+    if (n) {
+      n.color = dot.dataset.color;
+      const el = document.querySelector(`.node[data-id="${colorTargetId}"]`);
+      if (el) el.dataset.color = dot.dataset.color;
+    }
+    hideColorPopup();
+    snapshot();
+  });
+});
+
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('#color-popup') && !e.target.closest('.node-color-dot')) hideColorPopup();
+});
+
+// ── TOOLBAR BUTTONS ───────────────────────────────────────────────────
+document.getElementById('btn-add-node').addEventListener('pointerdown', () => {
+  const cp = screenToCanvas(window.innerWidth/2, window.innerHeight/2);
+  addNode(cp.x - 60, cp.y + (state.nodes.length % 5) * 60 - 100);
+});
+
+document.getElementById('btn-sticky').addEventListener('pointerdown', () => {
+  openHWOverlay(null);
+});
+
+document.getElementById('btn-undo').addEventListener('pointerdown', undo);
+document.getElementById('btn-redo').addEventListener('pointerdown', redo);
+
+document.getElementById('btn-fit').addEventListener('pointerdown', fitAll);
+
+document.getElementById('btn-clear').addEventListener('pointerdown', () => {
+  if (confirm('確定要清空畫布？此操作無法復原。')) clearCanvas();
+});
+
+function clearCanvas() {
+  state.nodes = [];
+  state.stickies = [];
+  state.connections = [];
+  rebuildDOM();
+  snapshot();
+  showToast('畫布已清空');
+}
+
+// ── FIT ALL ───────────────────────────────────────────────────────────
+function fitAll() {
+  const all = [...state.nodes, ...state.stickies];
+  if (!all.length) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  all.forEach(item => {
+    minX = Math.min(minX, item.x);
+    minY = Math.min(minY, item.y);
+    maxX = Math.max(maxX, item.x + 220);
+    maxY = Math.max(maxY, item.y + 120);
+  });
+  const W = container.clientWidth, H = container.clientHeight;
+  const scaleX = W / (maxX - minX + 120);
+  const scaleY = H / (maxY - minY + 120);
+  vscale = Math.min(1.5, Math.max(0.15, Math.min(scaleX, scaleY)));
+  vx = W/2 - (minX + (maxX - minX)/2) * vscale;
+  vy = H/2 - (minY + (maxY - minY)/2) * vscale;
+  applyTransform();
+}
+
+// ── SAVE / LOAD ───────────────────────────────────────────────────────
+document.getElementById('btn-save').addEventListener('pointerdown', () => {
+  // Save stickies' current canvas data
+  document.querySelectorAll('.sticky').forEach(el => {
+    const id = el.dataset.id;
+    const s = state.stickies.find(s => s.id === id);
+    if (s) s.dataURL = el.querySelector('canvas').toDataURL();
+  });
+  const data = JSON.stringify({state, nextId, viewport:{vx,vy,vscale}}, null, 2);
+  download('brainstorm.json', data, 'application/json');
+  showToast('已存檔');
+});
+
+function download(filename, text, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type: mime}));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── EXPORT MARKDOWN ───────────────────────────────────────────────────
+document.getElementById('btn-export-md').addEventListener('pointerdown', () => {
+  const md = exportMarkdown();
+  download('brainstorm.md', md, 'text/markdown');
+  showToast('已匯出 Markdown');
+});
+
+function exportMarkdown() {
+  // Build adjacency: find roots (no incoming connections)
+  const hasIncoming = new Set(state.connections.map(c => c.to));
+  const roots = state.nodes.filter(n => !hasIncoming.has(n.id));
+  if (!roots.length && state.nodes.length) roots.push(...state.nodes.slice(0,1));
+
+  const visited = new Set();
+  const lines = ['# Brainstorm\n'];
+
+  function renderNode(nodeId, depth) {
+    if (visited.has(nodeId)) return;
+    visited.add(nodeId);
+    const n = state.nodes.find(n => n.id === nodeId);
+    if (!n) return;
+    const prefix = depth === 0 ? '## ' : '  '.repeat(depth - 1) + '- ';
+    lines.push(prefix + (n.text || '(empty)'));
+    const children = state.connections.filter(c => c.from === nodeId).map(c => c.to);
+    children.forEach(cid => renderNode(cid, depth + 1));
+  }
+
+  roots.forEach(n => renderNode(n.id, 0));
+
+  // Orphan nodes
+  state.nodes.forEach(n => {
+    if (!visited.has(n.id)) lines.push('## ' + (n.text || '(empty)'));
+  });
+
+  if (state.stickies.length) {
+    lines.push('\n---\n');
+    lines.push(`> ${state.stickies.length} 張手寫便利貼（圖片內容請見原始檔案）`);
+  }
+
+  return lines.join('\n');
+}
+
+// ── IMPORT ────────────────────────────────────────────────────────────
+document.getElementById('btn-import').addEventListener('pointerdown', () => {
+  document.getElementById('import-input').click();
+});
+
+document.getElementById('import-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const text = ev.target.result;
+    if (file.name.endsWith('.json')) {
+      importJSON(text);
+    } else {
+      importMarkdown(text);
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+function importJSON(text) {
+  try {
+    const data = JSON.parse(text);
+    Object.assign(state, data.state);
+    nextId = data.nextId || (Date.now());
+    if (data.viewport) { vx = data.viewport.vx; vy = data.viewport.vy; vscale = data.viewport.vscale; }
+    rebuildDOM();
+    applyTransform();
+    snapshot();
+    showToast('已匯入 JSON');
+  } catch {
+    showToast('JSON 格式錯誤');
+  }
+}
+
+function importMarkdown(text) {
+  state.nodes = []; state.connections = []; state.stickies = [];
+  canvasEl.querySelectorAll('.node,.sticky').forEach(el => el.remove());
+  svgLayer.querySelectorAll('.conn-line').forEach(el => el.remove());
+
+  const lines = text.split('\n');
+  const stack = []; // {id, depth}
+  let xBase = 100, yBase = 100;
+  let col = 0;
+
+  lines.forEach(line => {
+    const h2 = line.match(/^##\s+(.+)/);
+    const li = line.match(/^(\s*)[-*]\s+(.+)/);
+    if (h2) {
+      const text = h2[1].trim();
+      const node = {id: genId(), x: xBase + col * 260, y: yBase, text, color: 'cyan'};
+      state.nodes.push(node);
+      createNodeDOM(node);
+      stack.length = 0;
+      stack.push({id: node.id, depth: 0});
+      col++;
+      yBase = 100;
+    } else if (li) {
+      const indent = li[1].length;
+      const text = li[2].trim();
+      const depth = Math.floor(indent / 2) + 1;
+      const node = {id: genId(), x: xBase + (col-1) * 260, y: yBase + depth * 100, text, color: 'purple'};
+      state.nodes.push(node);
+      createNodeDOM(node);
+      // find parent
+      while (stack.length && stack[stack.length-1].depth >= depth) stack.pop();
+      if (stack.length) {
+        const conn = {id: genId(), from: stack[stack.length-1].id, to: node.id};
+        state.connections.push(conn);
+        createConnLine(conn);
+      }
+      stack.push({id: node.id, depth});
+      yBase += 20;
+    }
+  });
+
+  fitAll();
+  snapshot();
+  showToast('已匯入 Markdown');
+}
+
+// ── MINIMAP ───────────────────────────────────────────────────────────
+const minimapCvs = document.getElementById('minimap-canvas');
+const mmCtx = minimapCvs.getContext('2d');
+
+function updateMinimap() {
+  const W = 120, H = 80;
+  minimapCvs.width = W; minimapCvs.height = H;
+  mmCtx.fillStyle = '#f0f2f5';
+  mmCtx.fillRect(0,0,W,H);
+
+  const all = [...state.nodes, ...state.stickies];
+  if (!all.length) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  all.forEach(item => {
+    minX = Math.min(minX, item.x);
+    minY = Math.min(minY, item.y);
+    maxX = Math.max(maxX, item.x + 200);
+    maxY = Math.max(maxY, item.y + 120);
+  });
+  const rangeX = maxX - minX || 1, rangeY = maxY - minY || 1;
+  const scale = Math.min(W / rangeX, H / rangeY) * 0.85;
+  const offX = (W - rangeX * scale) / 2;
+  const offY = (H - rangeY * scale) / 2;
+
+  state.nodes.forEach(n => {
+    mmCtx.fillStyle = 'rgba(0,119,204,0.7)';
+    mmCtx.fillRect(offX + (n.x - minX)*scale, offY + (n.y - minY)*scale, 16*scale, 8*scale);
+  });
+  state.stickies.forEach(s => {
+    mmCtx.fillStyle = 'rgba(255,220,0,0.4)';
+    mmCtx.fillRect(offX + (s.x - minX)*scale, offY + (s.y - minY)*scale, 12*scale, 12*scale);
+  });
+
+  // viewport rect
+  const vpX = -vx / vscale, vpY = -vy / vscale;
+  const vpW = container.clientWidth / vscale, vpH = container.clientHeight / vscale;
+  mmCtx.strokeStyle = 'rgba(0,0,0,0.25)';
+  mmCtx.lineWidth = 1;
+  mmCtx.strokeRect(
+    offX + (vpX - minX)*scale,
+    offY + (vpY - minY)*scale,
+    vpW * scale, vpH * scale
+  );
+}
+
+// ── KEYBOARD SHORTCUTS ────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.closest('[contenteditable]')) return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); redo(); }
+  if (e.key === 'Escape') { cancelConnecting(); deselectAll(); hideCtxMenu(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    selectedIds.forEach(id => deleteNode(id));
+    selectedIds.clear();
+  }
+});
+
+// ── TOAST ─────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, duration = 2000) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────
+function init() {
+  // Load from localStorage
+  try {
+    const saved = localStorage.getItem('bst_state');
+    if (saved) {
+      const data = JSON.parse(saved);
+      Object.assign(state, data.state);
+      nextId = data.nextId || Date.now();
+      if (data.viewport) { vx = data.viewport.vx; vy = data.viewport.vy; vscale = data.viewport.vscale; }
+      rebuildDOM();
+      applyTransform();
+    }
+  } catch {}
+
+  // Auto-save to localStorage every 30s
+  setInterval(() => {
+    document.querySelectorAll('.sticky').forEach(el => {
+      const id = el.dataset.id;
+      const s = state.stickies.find(s => s.id === id);
+      if (s) s.dataURL = el.querySelector('canvas').toDataURL();
+    });
+    localStorage.setItem('bst_state', JSON.stringify({state, nextId, viewport:{vx,vy,vscale}}));
+  }, 30000);
+
+  snapshot();
+  updateUndoRedo();
+  updateMinimap();
+  showToast('雙擊畫布新增節點 · 長按顯示選單', 3000);
+}
+
+init();
+</script>
+</body>
+</html>
