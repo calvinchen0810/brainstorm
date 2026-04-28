@@ -130,6 +130,12 @@
     pointer-events: none;
     overflow: visible;
   }
+  #svg-layer > * {
+    pointer-events: auto;
+  }
+  #svg-layer > defs {
+    pointer-events: none;
+  }
 
   .conn-line {
     stroke: var(--border-active);
@@ -138,9 +144,31 @@
     marker-end: url(#arrowhead);
     transition: stroke 0.2s;
   }
-  .conn-line:hover { stroke: var(--accent); }
-  .conn-line.selected { stroke: var(--accent); }
+  .conn-line:hover { stroke: var(--accent); stroke-width: 3; }
+  .conn-line.selected { stroke: var(--accent); stroke-width: 3; }
   .conn-line.temp { stroke: var(--accent2); stroke-dasharray: 5 3; opacity: 0.7; }
+
+  /* ── CONNECTION DELETE BUTTON ── */
+  #conn-del-btn {
+    display: none;
+    position: absolute;
+    z-index: 500;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--accent3);
+    color: #fff;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s;
+    pointer-events: auto;
+  }
+  #conn-del-btn.active { display: flex; }
+  #conn-del-btn:hover { transform: translate(-50%, -50%) scale(1.15); }
+  #conn-del-btn svg { width: 14px; height: 14px; }
 
   /* ── NODES ── */
   .node {
@@ -721,6 +749,9 @@
       </defs>
     </svg>
   </div>
+  <button id="conn-del-btn" title="刪除連線">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
 </div>
 
 <!-- ZOOM INDICATOR -->
@@ -857,6 +888,7 @@ const MAX_HIST = 60;
 // UI state
 let connectingFrom = null; // node id being connected
 let selectedIds = new Set();
+let selectedConnId = null;
 let contextPos = {x:0, y:0}; // canvas coords for context menu
 let colorTargetId = null;
 
@@ -932,7 +964,8 @@ function restoreSnapshot(s) {
 function rebuildDOM() {
   // Remove all nodes & stickies, rebuild
   canvasEl.querySelectorAll('.node,.sticky').forEach(el => el.remove());
-  svgLayer.querySelectorAll('.conn-line').forEach(el => el.remove());
+  svgLayer.querySelectorAll('.conn-line,.conn-hit').forEach(el => el.remove());
+  deselectConn();
   state.nodes.forEach(n => createNodeDOM(n));
   state.stickies.forEach(s => createStickyDOM(s));
   state.connections.forEach(c => createConnLine(c));
@@ -1214,6 +1247,7 @@ function selectNode(id) {
 
 function deselectAll() {
   selectedIds.clear();
+  deselectConn();
   document.querySelectorAll('.node').forEach(el => el.classList.remove('selected'));
   document.querySelectorAll('.sticky').forEach(el => el.classList.remove('selected'));
   cancelConnecting();
@@ -1248,7 +1282,8 @@ function deleteNode(id) {
   state.nodes = state.nodes.filter(n => n.id !== id);
   state.connections = state.connections.filter(c => c.from !== id && c.to !== id);
   document.querySelector(`.node[data-id="${id}"]`)?.remove();
-  svgLayer.querySelectorAll('.conn-line').forEach(el => el.remove());
+  svgLayer.querySelectorAll('.conn-line,.conn-hit').forEach(el => el.remove());
+  deselectConn();
   state.connections.forEach(c => createConnLine(c));
   snapshot();
 }
@@ -1256,6 +1291,54 @@ function deleteNode(id) {
 // ── CONNECTION ────────────────────────────────────────────────────────
 let tempLine = null;
 let connectingFromPort = null; // 'top'|'bottom'|'left'|'right'
+
+// ── Connection selection / deletion ──
+function selectConn(connId) {
+  deselectConn();
+  selectedIds.clear();
+  document.querySelectorAll('.node').forEach(el => el.classList.remove('selected'));
+  selectedConnId = connId;
+  const path = svgLayer.querySelector(`path.conn-line[data-conn-id="${connId}"]`);
+  if (path) path.classList.add('selected');
+  positionConnDelBtn(connId);
+}
+
+function deselectConn() {
+  if (!selectedConnId) return;
+  const path = svgLayer.querySelector(`path.conn-line[data-conn-id="${selectedConnId}"]`);
+  if (path) path.classList.remove('selected');
+  selectedConnId = null;
+  document.getElementById('conn-del-btn').classList.remove('active');
+}
+
+function deleteConn(connId) {
+  state.connections = state.connections.filter(c => c.id !== connId);
+  svgLayer.querySelectorAll(`[data-conn-id="${connId}"]`).forEach(el => el.remove());
+  deselectConn();
+  snapshot();
+}
+
+function positionConnDelBtn(connId) {
+  const conn = state.connections.find(c => c.id === connId);
+  if (!conn) { deselectConn(); return; }
+  const fromEl = document.querySelector(`.node[data-id="${conn.from}"]`);
+  const toEl   = document.querySelector(`.node[data-id="${conn.to}"]`);
+  if (!fromEl || !toEl) return;
+  const fp = getPortPos(fromEl, conn.fromPort || 'right');
+  const tp = getPortPos(toEl, conn.toPort || 'left');
+  // Midpoint in canvas space → convert to screen space
+  const mx = (fp.x + tp.x) / 2;
+  const my = (fp.y + tp.y) / 2;
+  const btn = document.getElementById('conn-del-btn');
+  btn.style.left = (mx * vscale + vx) + 'px';
+  btn.style.top  = (my * vscale + vy) + 'px';
+  btn.classList.add('active');
+}
+
+document.getElementById('conn-del-btn').addEventListener('pointerdown', e => {
+  e.stopPropagation();
+  if (selectedConnId) deleteConn(selectedConnId);
+});
 
 // Get the canvas-space coordinate of a port on a node element
 function getPortPos(el, port) {
@@ -1354,12 +1437,32 @@ function createConnLine(conn) {
   path.style.pointerEvents = 'stroke';
   path.style.cursor = 'pointer';
   svgLayer.appendChild(path);
-  path.addEventListener('dblclick', () => {
-    state.connections = state.connections.filter(c => c.id !== conn.id);
-    path.remove();
-    snapshot();
-  });
+
+  // Also add a wider invisible hit area for easier touch/click
+  const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  hitArea.className.baseVal = 'conn-hit';
+  hitArea.dataset.connId = conn.id;
+  hitArea.setAttribute('stroke', 'transparent');
+  hitArea.setAttribute('stroke-width', '20');
+  hitArea.setAttribute('fill', 'none');
+  hitArea.style.pointerEvents = 'stroke';
+  hitArea.style.cursor = 'pointer';
+  svgLayer.appendChild(hitArea);
+
+  function onClickConn(e) {
+    e.stopPropagation();
+    selectConn(conn.id);
+  }
+  path.addEventListener('click', onClickConn);
+  hitArea.addEventListener('click', onClickConn);
+
+  // Keep legacy dblclick delete as well
+  path.addEventListener('dblclick', () => deleteConn(conn.id));
+  hitArea.addEventListener('dblclick', () => deleteConn(conn.id));
+
   updateConnLine(path, conn);
+  // Sync hit area path
+  hitArea.setAttribute('d', path.getAttribute('d') || '');
   return path;
 }
 
@@ -1377,9 +1480,15 @@ function updateConnLine(path, conn) {
 
 function updateConnections() {
   state.connections.forEach(conn => {
-    const path = svgLayer.querySelector(`[data-conn-id="${conn.id}"]`);
-    if (path) updateConnLine(path, conn);
+    const path = svgLayer.querySelector(`path.conn-line[data-conn-id="${conn.id}"]`);
+    const hit  = svgLayer.querySelector(`path.conn-hit[data-conn-id="${conn.id}"]`);
+    if (path) {
+      updateConnLine(path, conn);
+      if (hit) hit.setAttribute('d', path.getAttribute('d') || '');
+    }
   });
+  // Reposition delete button if a connection is selected
+  if (selectedConnId) positionConnDelBtn(selectedConnId);
 }
 
 // ── STICKY ────────────────────────────────────────────────────────────
@@ -1656,6 +1765,8 @@ let panning = false, panStartX, panStartY, panOrigX, panOrigY;
 let pinchDist = 0, pinchScale0, pinchVx0, pinchVy0;
 
 container.addEventListener('pointerdown', e => {
+  // Let connection line clicks through — don't pan or deselect
+  if (e.target.closest('.conn-line, .conn-hit')) return;
   if (e.target !== container && e.target !== canvasEl && !e.target.closest('#svg-layer')) return;
   if (connectingFrom) { cancelConnecting(); return; }
   deselectAll();
@@ -2109,8 +2220,12 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); redo(); }
   if (e.key === 'Escape') { cancelConnecting(); deselectAll(); hideCtxMenu(); }
   if (e.key === 'Delete' || e.key === 'Backspace') {
-    selectedIds.forEach(id => deleteNode(id));
-    selectedIds.clear();
+    if (selectedConnId) {
+      deleteConn(selectedConnId);
+    } else {
+      selectedIds.forEach(id => deleteNode(id));
+      selectedIds.clear();
+    }
   }
 });
 
