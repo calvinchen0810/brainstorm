@@ -1791,6 +1791,7 @@ container.addEventListener('pointerup', () => { panning = false; });
 let lastCanvasTap = 0;
 container.addEventListener('pointerup', e => {
   if (e.target !== container && e.target !== canvasEl) return;
+  if (wasPinching) return;
   // Cancel connecting if tapping empty canvas
   if (connectingFrom) { cancelConnecting(); return; }
   const now = Date.now();
@@ -1823,8 +1824,10 @@ container.addEventListener('contextmenu', e => {
 
 // Pinch zoom (touch)
 let activePointers = new Map();
+let wasPinching = false;
 container.addEventListener('pointerdown', e => {
   activePointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (activePointers.size >= 2) wasPinching = true;
 });
 container.addEventListener('pointermove', e => {
   if (!activePointers.has(e.pointerId)) return;
@@ -1848,10 +1851,17 @@ container.addEventListener('pointermove', e => {
 container.addEventListener('pointerup', e => {
   activePointers.delete(e.pointerId);
   if (activePointers.size < 2) pinchDist = 0;
+  if (activePointers.size === 0 && wasPinching) {
+    // Reset pinch flag after a short delay so the pointerup doesn't trigger double-tap
+    setTimeout(() => { wasPinching = false; }, 350);
+  }
 });
 container.addEventListener('pointercancel', e => {
   activePointers.delete(e.pointerId);
   if (activePointers.size < 2) pinchDist = 0;
+  if (activePointers.size === 0 && wasPinching) {
+    setTimeout(() => { wasPinching = false; }, 350);
+  }
 });
 
 // Mouse wheel zoom
