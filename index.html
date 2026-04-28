@@ -327,6 +327,15 @@
   }
   #hw-overlay.active { display: flex; }
 
+  #hw-canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 12px;
+  }
+
   #hw-toolbar {
     display: flex;
     align-items: center;
@@ -394,10 +403,15 @@
   .hw-btn.primary:hover { background: rgba(0,229,255,0.2); }
 
   #hw-canvas {
-    flex: 1;
     display: block;
     touch-action: none;
     cursor: crosshair;
+    background: #fffbe6;
+    border-radius: 6px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+    margin: auto;
+    max-width: 100%;
+    max-height: 100%;
   }
 
   /* ── CONTEXT MENU ── */
@@ -734,12 +748,15 @@
     <button class="hw-btn" id="hw-clear">清除</button>
     <button class="hw-btn" id="hw-undo" title="復原" style="opacity:0.35;">↩ 復原</button>
     <button class="hw-btn" id="hw-redo" title="重做" style="opacity:0.35;">↪ 重做</button>
+    <button class="hw-btn" id="hw-zoom" title="切換縮放倍率">2x</button>
     <div style="margin-left:auto;display:flex;gap:8px;">
       <button class="hw-btn" id="hw-cancel">取消</button>
       <button class="hw-btn primary" id="hw-confirm">貼上</button>
     </div>
   </div>
-  <canvas id="hw-canvas"></canvas>
+  <div id="hw-canvas-wrap">
+    <canvas id="hw-canvas"></canvas>
+  </div>
 </div>
 
 <!-- CONTEXT MENU -->
@@ -817,6 +834,17 @@ const state = {
 
 let nextId = 1;
 const genId = () => `id_${nextId++}`;
+
+// Shared memo canvas geometry (view + edit must match)
+const MEMO_STICKY_SIZE = 200;
+const MEMO_STICKY_BORDER = 1;
+const MEMO_HEADER_HEIGHT = 33;
+const MEMO_CSS_W = MEMO_STICKY_SIZE - MEMO_STICKY_BORDER * 2;
+const MEMO_CSS_H = MEMO_STICKY_SIZE - MEMO_STICKY_BORDER * 2 - MEMO_HEADER_HEIGHT;
+const MEMO_PX_W = MEMO_CSS_W * 2;
+const MEMO_PX_H = MEMO_CSS_H * 2;
+const MEMO_EDIT_ZOOMS = [1, 2, 3];
+let hwEditZoom = 2;
 
 // Viewport transform
 let vx = 0, vy = 0, vscale = 1;
@@ -1368,14 +1396,14 @@ function createStickyDOM(s) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
-    <canvas width="400" height="334"></canvas>
+    <canvas width="${MEMO_PX_W}" height="${MEMO_PX_H}"></canvas>
   `;
 
   const cvs = el.querySelector('canvas');
   const ctx2 = cvs.getContext('2d');
   if (s.dataURL) {
     const img = new Image();
-    img.onload = () => ctx2.drawImage(img, 0, 0);
+    img.onload = () => ctx2.drawImage(img, 0, 0, cvs.width, cvs.height);
     img.src = s.dataURL;
   }
 
@@ -1463,22 +1491,41 @@ function hwUpdateUndoRedo() {
   document.getElementById('hw-redo').style.opacity = hwHistIdx < hwHistory.length - 1 ? '1' : '0.35';
 }
 
+function hwApplyZoom() {
+  hwCanvas.style.width = MEMO_CSS_W * hwEditZoom + 'px';
+  hwCanvas.style.height = MEMO_CSS_H * hwEditZoom + 'px';
+}
+
+function hwUpdateZoomBtn() {
+  const btn = document.getElementById('hw-zoom');
+  if (btn) btn.textContent = hwEditZoom + 'x';
+}
+
 function openHWOverlay(stickyId = null) {
   hwTargetId = stickyId;
-  hwCanvas.width  = window.innerWidth;
-  hwCanvas.height = window.innerHeight - 60;
-  hwCtx.fillStyle = '#f5f6fa';
-  hwCtx.fillRect(0, 0, hwCanvas.width, hwCanvas.height);
-
   hwOverlay.classList.add('active');
-  // Reset history and save initial state after image loads
+
+  // Keep edit mode drawing area exactly the same as sticky view mode.
+  hwCanvas.width = MEMO_PX_W;
+  hwCanvas.height = MEMO_PX_H;
+  // Show edit canvas at selectable zoom for easier finger/stylus input.
+  hwApplyZoom();
+  hwUpdateZoomBtn();
+  hwCtx.scale(2, 2);
+  hwCtx.fillStyle = '#fffbe6';
+  hwCtx.fillRect(0, 0, MEMO_CSS_W, MEMO_CSS_H);
+
+  // Reset history
   hwHistory = [];
   hwHistIdx = -1;
   if (stickyId) {
     const sticky = state.stickies.find(s => s.id === stickyId);
     if (sticky?.dataURL) {
       const img = new Image();
-      img.onload = () => { hwCtx.drawImage(img, 0, 0, hwCanvas.width, hwCanvas.height); hwSaveState(); };
+      img.onload = () => {
+        hwCtx.drawImage(img, 0, 0, MEMO_CSS_W, MEMO_CSS_H);
+        hwSaveState();
+      };
       img.src = sticky.dataURL;
     } else {
       hwSaveState();
@@ -1511,26 +1558,41 @@ document.getElementById('hw-eraser').addEventListener('pointerdown', () => {
 });
 
 document.getElementById('hw-clear').addEventListener('pointerdown', () => {
-  hwCtx.fillStyle = '#f5f6fa';
-  hwCtx.fillRect(0, 0, hwCanvas.width, hwCanvas.height);
+  const cw = hwCanvas.width / 2, ch = hwCanvas.height / 2;
+  hwCtx.fillStyle = '#fffbe6';
+  hwCtx.fillRect(0, 0, cw, ch);
   hwSaveState();
 });
 
 document.getElementById('hw-undo').addEventListener('pointerdown', () => hwUndo());
 document.getElementById('hw-redo').addEventListener('pointerdown', () => hwRedo());
+document.getElementById('hw-zoom').addEventListener('pointerdown', () => {
+  const idx = MEMO_EDIT_ZOOMS.indexOf(hwEditZoom);
+  const nextIdx = (idx + 1) % MEMO_EDIT_ZOOMS.length;
+  hwEditZoom = MEMO_EDIT_ZOOMS[nextIdx];
+  hwApplyZoom();
+  hwUpdateZoomBtn();
+  showToast('編輯縮放：' + hwEditZoom + 'x', 900);
+});
+
+function hwLogicalPos(e) {
+  return { x: e.offsetX / hwEditZoom, y: e.offsetY / hwEditZoom };
+}
 
 hwCanvas.addEventListener('pointerdown', e => {
+  const p = hwLogicalPos(e);
   hwDrawing = true;
   hwCtx.beginPath();
-  hwCtx.moveTo(e.offsetX, e.offsetY);
+  hwCtx.moveTo(p.x, p.y);
   hwCanvas.setPointerCapture(e.pointerId);
 });
 hwCanvas.addEventListener('pointermove', e => {
+  const p = hwLogicalPos(e);
   if (!hwDrawing) return;
   if (hwEraser) {
-    hwCtx.fillStyle = '#f5f6fa';
+    hwCtx.fillStyle = '#fffbe6';
     hwCtx.beginPath();
-    hwCtx.arc(e.offsetX, e.offsetY, hwSize * 3, 0, Math.PI * 2);
+    hwCtx.arc(p.x, p.y, hwSize * 3, 0, Math.PI * 2);
     hwCtx.fill();
     return;
   }
@@ -1538,10 +1600,10 @@ hwCanvas.addEventListener('pointermove', e => {
   hwCtx.lineCap = 'round';
   hwCtx.lineJoin = 'round';
   hwCtx.strokeStyle = hwColor;
-  hwCtx.lineTo(e.offsetX, e.offsetY);
+  hwCtx.lineTo(p.x, p.y);
   hwCtx.stroke();
   hwCtx.beginPath();
-  hwCtx.moveTo(e.offsetX, e.offsetY);
+  hwCtx.moveTo(p.x, p.y);
 });
 hwCanvas.addEventListener('pointerup', () => {
   if (hwDrawing) {
