@@ -6,6 +6,7 @@
 <title>BRAINSTORM</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
   :root {
     --bg: #f0f2f5;
@@ -535,6 +536,99 @@
   }
   .node, .sticky { animation: node-in 0.18s cubic-bezier(0.34,1.56,0.64,1); }
 
+  /* ── COLLAB PANEL ── */
+  #collab-panel {
+    position: fixed;
+    top: calc(var(--toolbar-h) + 12px);
+    right: 12px;
+    width: 260px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    z-index: 999;
+    display: none;
+    overflow: hidden;
+    font-family: var(--font-mono);
+  }
+  #collab-panel.active { display: block; }
+  .collab-header {
+    padding: 12px 14px 8px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .collab-header .collab-status {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-dimmer);
+    flex-shrink: 0;
+  }
+  .collab-header .collab-status.connected { background: #2d9e5f; box-shadow: 0 0 6px rgba(45,158,95,0.5); }
+  .collab-body { padding: 12px 14px; }
+  .collab-body p { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.5; }
+  .collab-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .collab-input {
+    flex: 1;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .collab-input:focus { border-color: var(--accent); }
+  .collab-input::placeholder { color: var(--text-dimmer); letter-spacing: 0.05em; }
+  .collab-btn {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .collab-btn:hover { background: var(--surface2); border-color: var(--border-active); }
+  .collab-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .collab-btn.primary:hover { opacity: 0.9; }
+  .collab-btn.danger { color: var(--accent3); }
+  .collab-btn.danger:hover { background: rgba(224,58,58,0.06); border-color: rgba(224,58,58,0.3); }
+  .collab-room-code {
+    font-size: 22px;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    color: var(--accent);
+    text-align: center;
+    padding: 8px 0;
+    user-select: all;
+    -webkit-user-select: all;
+  }
+  .collab-peers {
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 6px 0 0;
+    border-top: 1px solid var(--border);
+    margin-top: 6px;
+  }
+  .collab-peers span { color: var(--accent); font-weight: 600; }
+
 </style>
 </head>
 <body>
@@ -590,6 +684,11 @@
     </button>
     <button class="tb-btn danger" id="btn-clear" title="清空畫布">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-collab" title="多人協作">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="label">協作</span>
     </button>
   </div>
 </div>
@@ -673,6 +772,41 @@
 
 <div id="toast"></div>
 
+<!-- COLLAB PANEL -->
+<div id="collab-panel">
+  <div class="collab-header">
+    <div class="collab-status" id="collab-status-dot"></div>
+    多人協作
+  </div>
+  <div class="collab-body" id="collab-idle">
+    <p>建立房間讓其他人加入，或輸入房間號碼加入他人的畫布。</p>
+    <div class="collab-row">
+      <button class="collab-btn primary" id="collab-create" style="flex:1;">建立房間</button>
+    </div>
+    <div class="collab-row">
+      <input class="collab-input" id="collab-join-code" placeholder="輸入房號" maxlength="6" inputmode="numeric">
+      <button class="collab-btn" id="collab-join">加入</button>
+    </div>
+  </div>
+  <div class="collab-body" id="collab-hosting" style="display:none;">
+    <p>分享此房間號碼給協作者：</p>
+    <div class="collab-room-code" id="collab-room-display"></div>
+    <div class="collab-peers" id="collab-peer-count">已連線：<span>0</span> 人</div>
+    <div class="collab-row" style="margin-top:10px;">
+      <button class="collab-btn" id="collab-copy" style="flex:1;">複製房號</button>
+      <button class="collab-btn danger" id="collab-disconnect">斷線</button>
+    </div>
+  </div>
+  <div class="collab-body" id="collab-joined" style="display:none;">
+    <p>已連線至房間：</p>
+    <div class="collab-room-code" id="collab-joined-display"></div>
+    <div class="collab-peers" id="collab-joined-peer-count">協作中</div>
+    <div class="collab-row" style="margin-top:10px;">
+      <button class="collab-btn danger" id="collab-leave" style="flex:1;">離開房間</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── STATE ──────────────────────────────────────────────────────────────
 const state = {
@@ -734,6 +868,8 @@ function snapshot() {
   if (history.length > MAX_HIST) history.shift();
   histIdx = history.length - 1;
   updateUndoRedo();
+  // Sync to collaboration peers
+  if (typeof collabBroadcast === 'function') collabBroadcast();
 }
 
 function updateUndoRedo() {
@@ -1927,6 +2063,244 @@ function showToast(msg, duration = 2000) {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────
+
+// ── COLLABORATION (WebRTC via PeerJS) ─────────────────────────────────
+const collabPanel = document.getElementById('collab-panel');
+const collabIdle = document.getElementById('collab-idle');
+const collabHosting = document.getElementById('collab-hosting');
+const collabJoined = document.getElementById('collab-joined');
+const collabStatusDot = document.getElementById('collab-status-dot');
+
+let collabPeer = null;       // PeerJS instance
+let collabRole = null;       // 'host' | 'guest' | null
+let collabRoomCode = null;
+let collabConns = [];        // host: array of DataConnection to guests
+let collabHostConn = null;   // guest: DataConnection to host
+let collabSyncLock = false;  // prevent echo loops
+
+function generateRoomCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function collabPeerId(code) {
+  return 'bst-room-' + code;
+}
+
+function collabUpdatePeerCount() {
+  const count = collabConns.filter(c => c.open).length;
+  const el = document.getElementById('collab-peer-count');
+  if (el) el.innerHTML = '已連線：<span>' + count + '</span> 人';
+}
+
+function collabShowPanel(view) {
+  collabIdle.style.display = view === 'idle' ? '' : 'none';
+  collabHosting.style.display = view === 'hosting' ? '' : 'none';
+  collabJoined.style.display = view === 'joined' ? '' : 'none';
+  collabStatusDot.classList.toggle('connected', view !== 'idle');
+}
+
+function collabGetState() {
+  return JSON.stringify({
+    nodes: state.nodes,
+    stickies: state.stickies,
+    connections: state.connections,
+    nextId: nextId
+  });
+}
+
+function collabApplyState(data) {
+  collabSyncLock = true;
+  try {
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    state.nodes = parsed.nodes || [];
+    state.stickies = parsed.stickies || [];
+    state.connections = parsed.connections || [];
+    if (parsed.nextId && parsed.nextId > nextId) nextId = parsed.nextId;
+    rebuildDOM();
+    updateMinimap();
+    snapshot();
+  } catch (e) {
+    console.warn('collab: bad state', e);
+  }
+  collabSyncLock = false;
+}
+
+// Broadcast state to all peers (host broadcasts to guests, guest sends to host)
+function collabBroadcast() {
+  if (collabSyncLock) return;
+  const payload = collabGetState();
+  if (collabRole === 'host') {
+    collabConns.forEach(c => { if (c.open) c.send(payload); });
+  } else if (collabRole === 'guest' && collabHostConn?.open) {
+    collabHostConn.send(payload);
+  }
+}
+
+// ── HOST: Create room ──
+function collabCreateRoom() {
+  collabRoomCode = generateRoomCode();
+  const peerId = collabPeerId(collabRoomCode);
+
+  collabPeer = new Peer(peerId, {
+    config: { iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]}
+  });
+
+  collabPeer.on('open', () => {
+    collabRole = 'host';
+    document.getElementById('collab-room-display').textContent = collabRoomCode;
+    collabShowPanel('hosting');
+    showToast('房間已建立：' + collabRoomCode, 3000);
+    document.getElementById('btn-collab').classList.add('active');
+  });
+
+  collabPeer.on('connection', conn => {
+    collabConns.push(conn);
+    conn.on('open', () => {
+      // Send current state to new peer
+      conn.send(collabGetState());
+      collabUpdatePeerCount();
+      showToast('有人加入了房間');
+    });
+    conn.on('data', data => {
+      // Guest sent an update → apply & relay to others
+      collabApplyState(data);
+      const payload = collabGetState();
+      collabConns.forEach(c => {
+        if (c !== conn && c.open) c.send(payload);
+      });
+    });
+    conn.on('close', () => {
+      collabConns = collabConns.filter(c => c !== conn);
+      collabUpdatePeerCount();
+      showToast('有人離開了房間');
+    });
+    conn.on('error', () => {
+      collabConns = collabConns.filter(c => c !== conn);
+      collabUpdatePeerCount();
+    });
+  });
+
+  collabPeer.on('error', err => {
+    if (err.type === 'unavailable-id') {
+      showToast('房號已被使用，請重試');
+      collabDisconnect();
+    } else {
+      console.warn('PeerJS error:', err);
+      showToast('連線錯誤：' + err.type);
+    }
+  });
+}
+
+// ── GUEST: Join room ──
+function collabJoinRoom(code) {
+  code = code.trim();
+  if (!/^\d{6}$/.test(code)) { showToast('請輸入 6 位數房號'); return; }
+
+  collabRoomCode = code;
+  collabPeer = new Peer(undefined, {
+    config: { iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]}
+  });
+
+  collabPeer.on('open', () => {
+    const conn = collabPeer.connect(collabPeerId(code), { reliable: true });
+    collabHostConn = conn;
+
+    conn.on('open', () => {
+      collabRole = 'guest';
+      document.getElementById('collab-joined-display').textContent = code;
+      collabShowPanel('joined');
+      showToast('已加入房間：' + code, 3000);
+      document.getElementById('btn-collab').classList.add('active');
+    });
+
+    conn.on('data', data => {
+      collabApplyState(data);
+    });
+
+    conn.on('close', () => {
+      showToast('與房間的連線已中斷');
+      collabDisconnect();
+    });
+
+    conn.on('error', err => {
+      showToast('連線錯誤：' + err.type);
+      collabDisconnect();
+    });
+  });
+
+  collabPeer.on('error', err => {
+    if (err.type === 'peer-unavailable') {
+      showToast('找不到此房間，請確認房號');
+    } else {
+      showToast('連線錯誤：' + err.type);
+    }
+    collabDisconnect();
+  });
+}
+
+function collabDisconnect() {
+  if (collabPeer) {
+    collabPeer.destroy();
+    collabPeer = null;
+  }
+  collabConns = [];
+  collabHostConn = null;
+  collabRole = null;
+  collabRoomCode = null;
+  collabSyncLock = false;
+  collabShowPanel('idle');
+  document.getElementById('btn-collab').classList.remove('active');
+}
+
+// ── Collab UI events ──
+document.getElementById('btn-collab').addEventListener('pointerdown', () => {
+  collabPanel.classList.toggle('active');
+});
+
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('#collab-panel') && !e.target.closest('#btn-collab')) {
+    collabPanel.classList.remove('active');
+  }
+});
+
+document.getElementById('collab-create').addEventListener('pointerdown', () => {
+  collabCreateRoom();
+});
+
+document.getElementById('collab-join').addEventListener('pointerdown', () => {
+  const code = document.getElementById('collab-join-code').value;
+  collabJoinRoom(code);
+});
+
+document.getElementById('collab-join-code').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    collabJoinRoom(e.target.value);
+  }
+});
+
+document.getElementById('collab-copy').addEventListener('pointerdown', () => {
+  if (collabRoomCode) {
+    navigator.clipboard.writeText(collabRoomCode).then(() => showToast('房號已複製'));
+  }
+});
+
+document.getElementById('collab-disconnect').addEventListener('pointerdown', () => {
+  collabDisconnect();
+  showToast('已斷線');
+});
+
+document.getElementById('collab-leave').addEventListener('pointerdown', () => {
+  collabDisconnect();
+  showToast('已離開房間');
+});
+
 function init() {
   // Load from localStorage
   try {
