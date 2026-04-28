@@ -633,6 +633,8 @@
     </div>
     <button class="hw-btn" id="hw-eraser" title="橡皮擦">橡皮擦</button>
     <button class="hw-btn" id="hw-clear">清除</button>
+    <button class="hw-btn" id="hw-undo" title="復原" style="opacity:0.35;">↩ 復原</button>
+    <button class="hw-btn" id="hw-redo" title="重做" style="opacity:0.35;">↪ 重做</button>
     <div style="margin-left:auto;display:flex;gap:8px;">
       <button class="hw-btn" id="hw-cancel">取消</button>
       <button class="hw-btn primary" id="hw-confirm">貼上</button>
@@ -1293,6 +1295,37 @@ let hwSize  = 3;
 let hwEraser = false;
 let hwDrawing = false;
 let hwTargetId = null; // sticky id to update
+let hwHistory = [];
+let hwHistIdx = -1;
+const HW_MAX_HIST = 40;
+
+function hwSaveState() {
+  const data = hwCtx.getImageData(0, 0, hwCanvas.width, hwCanvas.height);
+  hwHistory.splice(hwHistIdx + 1);
+  hwHistory.push(data);
+  if (hwHistory.length > HW_MAX_HIST) hwHistory.shift();
+  hwHistIdx = hwHistory.length - 1;
+  hwUpdateUndoRedo();
+}
+
+function hwUndo() {
+  if (hwHistIdx <= 0) return;
+  hwHistIdx--;
+  hwCtx.putImageData(hwHistory[hwHistIdx], 0, 0);
+  hwUpdateUndoRedo();
+}
+
+function hwRedo() {
+  if (hwHistIdx >= hwHistory.length - 1) return;
+  hwHistIdx++;
+  hwCtx.putImageData(hwHistory[hwHistIdx], 0, 0);
+  hwUpdateUndoRedo();
+}
+
+function hwUpdateUndoRedo() {
+  document.getElementById('hw-undo').style.opacity = hwHistIdx > 0 ? '1' : '0.35';
+  document.getElementById('hw-redo').style.opacity = hwHistIdx < hwHistory.length - 1 ? '1' : '0.35';
+}
 
 function openHWOverlay(stickyId = null) {
   hwTargetId = stickyId;
@@ -1301,17 +1334,22 @@ function openHWOverlay(stickyId = null) {
   hwCtx.fillStyle = '#f5f6fa';
   hwCtx.fillRect(0, 0, hwCanvas.width, hwCanvas.height);
 
-  // If editing existing sticky, load its content
+  hwOverlay.classList.add('active');
+  // Reset history and save initial state after image loads
+  hwHistory = [];
+  hwHistIdx = -1;
   if (stickyId) {
     const sticky = state.stickies.find(s => s.id === stickyId);
     if (sticky?.dataURL) {
       const img = new Image();
-      img.onload = () => hwCtx.drawImage(img, 0, 0, hwCanvas.width, hwCanvas.height);
+      img.onload = () => { hwCtx.drawImage(img, 0, 0, hwCanvas.width, hwCanvas.height); hwSaveState(); };
       img.src = sticky.dataURL;
+    } else {
+      hwSaveState();
     }
+  } else {
+    hwSaveState();
   }
-
-  hwOverlay.classList.add('active');
 }
 
 document.querySelectorAll('.hw-color').forEach(btn => {
@@ -1337,9 +1375,13 @@ document.getElementById('hw-eraser').addEventListener('pointerdown', () => {
 });
 
 document.getElementById('hw-clear').addEventListener('pointerdown', () => {
-  hwCtx.fillStyle = '#0a0a0f';
+  hwCtx.fillStyle = '#f5f6fa';
   hwCtx.fillRect(0, 0, hwCanvas.width, hwCanvas.height);
+  hwSaveState();
 });
+
+document.getElementById('hw-undo').addEventListener('pointerdown', () => hwUndo());
+document.getElementById('hw-redo').addEventListener('pointerdown', () => hwRedo());
 
 hwCanvas.addEventListener('pointerdown', e => {
   hwDrawing = true;
@@ -1350,7 +1392,10 @@ hwCanvas.addEventListener('pointerdown', e => {
 hwCanvas.addEventListener('pointermove', e => {
   if (!hwDrawing) return;
   if (hwEraser) {
-    hwCtx.clearRect(e.offsetX - hwSize*3, e.offsetY - hwSize*3, hwSize*6, hwSize*6);
+    hwCtx.fillStyle = '#f5f6fa';
+    hwCtx.beginPath();
+    hwCtx.arc(e.offsetX, e.offsetY, hwSize * 3, 0, Math.PI * 2);
+    hwCtx.fill();
     return;
   }
   hwCtx.lineWidth = hwSize;
@@ -1362,7 +1407,12 @@ hwCanvas.addEventListener('pointermove', e => {
   hwCtx.beginPath();
   hwCtx.moveTo(e.offsetX, e.offsetY);
 });
-hwCanvas.addEventListener('pointerup', () => { hwDrawing = false; });
+hwCanvas.addEventListener('pointerup', () => {
+  if (hwDrawing) {
+    hwDrawing = false;
+    hwSaveState();
+  }
+});
 
 document.getElementById('hw-cancel').addEventListener('pointerdown', () => {
   hwOverlay.classList.remove('active');
