@@ -713,7 +713,8 @@ function applyTransform() {
 }
 
 function screenToCanvas(sx, sy) {
-  return { x: (sx - vx) / vscale, y: (sy - vy) / vscale };
+  const cRect = container.getBoundingClientRect();
+  return { x: (sx - cRect.left - vx) / vscale, y: (sy - cRect.top - vy) / vscale };
 }
 
 function showZoom() {
@@ -1092,23 +1093,23 @@ let connectingFromPort = null; // 'top'|'bottom'|'left'|'right'
 
 // Get the canvas-space coordinate of a port on a node element
 function getPortPos(el, port) {
-  const rect = el.getBoundingClientRect();
-  let sx, sy;
+  const x = parseFloat(el.style.left);
+  const y = parseFloat(el.style.top);
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
   switch (port) {
-    case 'top':    sx = rect.left + rect.width / 2;  sy = rect.top;                   break;
-    case 'bottom': sx = rect.left + rect.width / 2;  sy = rect.bottom;                break;
-    case 'left':   sx = rect.left;                    sy = rect.top + rect.height / 2; break;
-    case 'right':  sx = rect.right;                   sy = rect.top + rect.height / 2; break;
-    default:       sx = rect.left + rect.width / 2;  sy = rect.top + rect.height / 2;
+    case 'top':    return { x: x + w / 2, y: y };
+    case 'bottom': return { x: x + w / 2, y: y + h };
+    case 'left':   return { x: x,         y: y + h / 2 };
+    case 'right':  return { x: x + w,     y: y + h / 2 };
+    default:       return { x: x + w / 2, y: y + h / 2 };
   }
-  return { x: (sx - vx) / vscale, y: (sy - vy) / vscale };
 }
 
 // Choose best receiving port on target node given source canvas position
 function bestTargetPort(fromCanvasPos, toEl) {
-  const rect = toEl.getBoundingClientRect();
-  const cx = ((rect.left + rect.right) / 2 - vx) / vscale;
-  const cy = ((rect.top + rect.bottom) / 2 - vy) / vscale;
+  const cx = parseFloat(toEl.style.left) + toEl.offsetWidth / 2;
+  const cy = parseFloat(toEl.style.top) + toEl.offsetHeight / 2;
   const dx = cx - fromCanvasPos.x;
   const dy = cy - fromCanvasPos.y;
   if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'left' : 'right';
