@@ -1806,7 +1806,9 @@ container.addEventListener('pointerup', e => {
 let ctxTimer;
 container.addEventListener('pointerdown', e => {
   if (e.target !== container && e.target !== canvasEl) return;
+  clearTimeout(ctxTimer);
   ctxTimer = setTimeout(() => {
+    if (wasPinching || activePointers.size >= 2) return;
     const cp = screenToCanvas(e.clientX, e.clientY);
     contextPos = cp;
     showCtxMenu(e.clientX, e.clientY);
@@ -1827,7 +1829,10 @@ let activePointers = new Map();
 let wasPinching = false;
 container.addEventListener('pointerdown', e => {
   activePointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
-  if (activePointers.size >= 2) wasPinching = true;
+  if (activePointers.size >= 2) {
+    wasPinching = true;
+    clearTimeout(ctxTimer);
+  }
 });
 container.addEventListener('pointermove', e => {
   if (!activePointers.has(e.pointerId)) return;
