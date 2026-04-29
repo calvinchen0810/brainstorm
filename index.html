@@ -2144,7 +2144,7 @@ document.getElementById('btn-redo').addEventListener('pointerdown', redo);
 
 document.getElementById('btn-fit').addEventListener('pointerdown', fitAll);
 
-document.getElementById('btn-clear').addEventListener('pointerdown', () => {
+document.getElementById('btn-clear').addEventListener('click', () => {
   if (confirm('確定要清空畫布？此操作無法復原。')) clearCanvas();
 });
 
