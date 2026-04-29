@@ -1632,8 +1632,8 @@ function createStickyDOM(s) {
   el.style.top  = s.y + 'px';
   el.innerHTML = `
     <div class="sticky-header">
-      <div class="sticky-drag-handle" title="拖曳移動"><svg viewBox="0 0 12 12" fill="currentColor" width="12" height="12"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="10" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="10" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/><circle cx="10" cy="10" r="1.1"/></svg></div>
       <input class="sticky-title" placeholder="標題…" value="${escHtml(s.title || '')}">
+      <div class="sticky-drag-handle" title="拖曳移動"><svg viewBox="0 0 12 12" fill="currentColor" width="12" height="12"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="10" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="10" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/><circle cx="10" cy="10" r="1.1"/></svg></div>
     </div>
     <canvas width="${MEMO_PX_W}" height="${MEMO_PX_H}"></canvas>
     <button class="sticky-del-float" title="刪除便利貼">
