@@ -243,6 +243,18 @@
     font-style: italic;
   }
 
+  .node-drag-handle {
+    width: 14px; height: 14px;
+    color: var(--text-dimmer);
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+    cursor: grab;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .node:hover .node-drag-handle { opacity: 1; }
+  .node-drag-handle svg { display: block; }
+
   .node-actions {
     display: flex;
     padding: 4px 6px;
@@ -383,7 +395,13 @@
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x;
   }
+  #hw-toolbar::-webkit-scrollbar { display: none; }
   #hw-toolbar .hw-title {
     font-family: var(--font-display);
     font-size: 13px;
@@ -393,6 +411,40 @@
     margin-right: 8px;
   }
 
+  #hw-color-picker { position: relative; flex-shrink: 0; }
+  #hw-color-btn {
+    width: 32px; height: 32px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: transparent;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #hw-color-btn:hover { border-color: var(--text-dim); }
+  #hw-color-preview {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    transition: background 0.15s;
+    pointer-events: none;
+  }
+  #hw-color-popup {
+    display: none;
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    gap: 6px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.13);
+    z-index: 3100;
+    flex-wrap: wrap;
+    width: max-content;
+  }
+  #hw-color-popup.open { display: flex; }
+
   .hw-color {
     width: 22px; height: 22px;
     border-radius: 50%;
@@ -401,7 +453,7 @@
     transition: transform 0.15s, border-color 0.15s;
     flex-shrink: 0;
   }
-  .hw-color.active { border-color: white; transform: scale(1.15); }
+  .hw-color.active { border-color: white; box-shadow: 0 0 0 1px var(--border-active); transform: scale(1.15); }
   .hw-color:hover { transform: scale(1.1); }
 
   .hw-size {
@@ -792,14 +844,19 @@
 
 <!-- HANDWRITING OVERLAY -->
 <div id="hw-overlay">
-  <div id="hw-toolbar">
-    <span class="hw-title">手寫記錄</span>
+  <div id="hw-color-popup">
     <div class="hw-color active" style="background:#1a1a2e" data-color="#1a1a2e"></div>
     <div class="hw-color" style="background:#0077cc" data-color="#0077cc"></div>
     <div class="hw-color" style="background:#e03a3a" data-color="#e03a3a"></div>
     <div class="hw-color" style="background:#2d9e5f" data-color="#2d9e5f"></div>
     <div class="hw-color" style="background:#d97706" data-color="#d97706"></div>
     <div class="hw-color" style="background:#6b44e0" data-color="#6b44e0"></div>
+  </div>
+  <div id="hw-toolbar">
+    <span class="hw-title">手寫記錄</span>
+    <div id="hw-color-picker">
+      <button id="hw-color-btn" title="筆刷顏色"><div id="hw-color-preview"></div></button>
+    </div>
     <div class="hw-size">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="color:var(--text-dimmer)"><circle cx="12" cy="12" r="4"/></svg>
       <input type="range" id="hw-brush-size" min="1" max="20" value="3">
@@ -1030,6 +1087,7 @@ function createNodeDOM(n) {
     <div class="node-header">
       <div class="node-dot node-color-dot" title="更換顏色"></div>
       <span style="font-size:9px;color:var(--text-dimmer);letter-spacing:.08em;font-family:var(--font-display);font-weight:600;flex:1;">NODE</span>
+      <div class="node-drag-handle" title="拖曳移動"><svg viewBox="0 0 12 12" fill="currentColor" width="12" height="12"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="10" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="10" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/><circle cx="10" cy="10" r="1.1"/></svg></div>
     </div>
     <div class="node-body" contenteditable="false" data-placeholder="輸入內容…">${escHtml(n.text)}</div>
     <div class="node-actions">
@@ -1600,6 +1658,7 @@ const hwCanvas  = document.getElementById('hw-canvas');
 const hwCtx     = hwCanvas.getContext('2d');
 let hwColor = '#1a1a2e';
 let hwSize  = 3;
+document.getElementById('hw-color-preview').style.background = hwColor;
 let hwEraser = false;
 let hwDrawing = false;
 let hwTargetId = null; // sticky id to update
@@ -1679,11 +1738,34 @@ function openHWOverlay(stickyId = null) {
   }
 }
 
+const hwColorPopup   = document.getElementById('hw-color-popup');
+const hwColorPreview = document.getElementById('hw-color-preview');
+const hwColorBtn     = document.getElementById('hw-color-btn');
+
+function hwCloseColorPopup() { hwColorPopup.classList.remove('open'); }
+
+hwColorBtn.addEventListener('pointerdown', e => {
+  e.stopPropagation();
+  const isOpen = hwColorPopup.classList.toggle('open');
+  if (isOpen) {
+    const br = hwColorBtn.getBoundingClientRect();
+    hwColorPopup.style.top  = (br.bottom + 8) + 'px';
+    hwColorPopup.style.left = (br.left + br.width / 2) + 'px';
+    hwColorPopup.style.transform = 'translateX(-50%)';
+  }
+});
+
+hwColorPopup.addEventListener('pointerdown', e => e.stopPropagation());
+hwOverlay.addEventListener('pointerdown', hwCloseColorPopup);
+
 document.querySelectorAll('.hw-color').forEach(btn => {
-  btn.addEventListener('pointerdown', () => {
+  btn.addEventListener('pointerdown', e => {
+    e.stopPropagation();
     document.querySelectorAll('.hw-color').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     hwColor = btn.dataset.color;
+    hwColorPreview.style.background = hwColor;
+    hwCloseColorPopup();
     hwEraser = false;
     document.getElementById('hw-eraser').style.background = '';
     document.getElementById('hw-eraser').style.color = '';
