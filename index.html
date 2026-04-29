@@ -247,6 +247,22 @@
     font-style: italic;
   }
 
+  .node-title {
+    flex: 1;
+    font-size: 9px;
+    color: var(--text-dimmer);
+    letter-spacing: .08em;
+    font-family: var(--font-display);
+    font-weight: 600;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 0;
+    min-width: 0;
+    cursor: text;
+  }
+  .node-title::placeholder { color: var(--text-dimmer); opacity: 0.4; }
+
   .node-drag-handle {
     width: 14px; height: 14px;
     color: var(--text-dimmer);
@@ -326,8 +342,7 @@
     border: 1px solid var(--sticky-yellow-border);
     border-radius: 4px;
     box-shadow: var(--node-shadow);
-    cursor: grab;
-    overflow: hidden;
+    cursor: default;
     transition: border-color 0.15s;
   }
   .sticky:active { cursor: grabbing; }
@@ -336,11 +351,21 @@
   .sticky-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 6px;
     padding: 6px 8px;
     background: rgba(255,220,0,0.05);
     border-bottom: 1px solid var(--sticky-yellow-border);
   }
+  .sticky-drag-handle {
+    width: 14px; height: 14px;
+    color: rgba(160,120,0,0.35);
+    flex-shrink: 0;
+    cursor: grab;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: none;
+  }
+  .sticky-drag-handle:active { cursor: grabbing; }
+  .sticky-drag-handle svg { display: block; }
   .sticky-title {
     flex: 1;
     font-size: 10px;
@@ -356,16 +381,26 @@
     cursor: text;
   }
   .sticky-title::placeholder { color: rgba(160,120,0,0.3); }
-  .sticky-del {
-    background: transparent; border: none;
-    color: rgba(160,120,0,0.35); cursor: pointer;
-    width: 18px; height: 18px;
+  .sticky-del-float {
+    position: absolute;
+    right: -10px; bottom: -10px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dimmer);
     display: flex; align-items: center; justify-content: center;
-    border-radius: 3px;
+    cursor: pointer;
+    opacity: 0;
     transition: all 0.15s;
+    z-index: 5;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    -webkit-tap-highlight-color: transparent;
   }
-  .sticky-del:hover { color: var(--accent3); background: rgba(255,107,107,0.1); }
-  .sticky-del svg { width: 11px; height: 11px; }
+  .sticky:hover .sticky-del-float,
+  .sticky.selected .sticky-del-float { opacity: 1; }
+  .sticky-del-float:hover { background: rgba(255,107,107,0.08); border-color: rgba(255,107,107,0.4); color: var(--accent3); }
+  .sticky-del-float svg { width: 10px; height: 10px; pointer-events: none; }
 
   .sticky canvas {
     display: block;
@@ -1093,7 +1128,7 @@ function createNodeDOM(n) {
     <div class="port right"  data-port="right"></div>
     <div class="node-header">
       <div class="node-dot node-color-dot" title="更換顏色"></div>
-      <span style="font-size:9px;color:var(--text-dimmer);letter-spacing:.08em;font-family:var(--font-display);font-weight:600;flex:1;">NODE</span>
+      <input class="node-title" placeholder="標題…" value="${escHtml(n.title || '')}">
       <div class="node-drag-handle" title="拖曳移動"><svg viewBox="0 0 12 12" fill="currentColor" width="12" height="12"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="10" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="10" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/><circle cx="10" cy="10" r="1.1"/></svg></div>
     </div>
     <div class="node-body" contenteditable="false" data-placeholder="輸入內容…">${escHtml(n.text)}</div>
@@ -1117,7 +1152,7 @@ function attachNodeEvents(el, n) {
   let longPressTimer;
 
   el.addEventListener('pointerdown', e => {
-    if (e.target.closest('button') || e.target.closest('[contenteditable="true"]')) return;
+    if (e.target.closest('button') || e.target.closest('[contenteditable="true"]') || e.target.tagName === 'INPUT') return;
     if (e.target.classList.contains('port')) return;
 
     pointerDownTime = Date.now();
@@ -1324,6 +1359,13 @@ function attachNodeEvents(el, n) {
   el.querySelector('.node-color-dot').addEventListener('pointerdown', e => {
     e.stopPropagation();
     showColorPopup(n.id, e.clientX, e.clientY);
+  });
+
+  const nodeTitleEl = el.querySelector('.node-title');
+  nodeTitleEl.addEventListener('pointerdown', e => e.stopPropagation());
+  nodeTitleEl.addEventListener('input', () => {
+    n.title = nodeTitleEl.value;
+    snapshot();
   });
 }
 
@@ -1590,12 +1632,13 @@ function createStickyDOM(s) {
   el.style.top  = s.y + 'px';
   el.innerHTML = `
     <div class="sticky-header">
+      <div class="sticky-drag-handle" title="拖曳移動"><svg viewBox="0 0 12 12" fill="currentColor" width="12" height="12"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="10" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="10" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/><circle cx="10" cy="10" r="1.1"/></svg></div>
       <input class="sticky-title" placeholder="標題…" value="${escHtml(s.title || '')}">
-      <button class="sticky-del">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
     </div>
     <canvas width="${MEMO_PX_W}" height="${MEMO_PX_H}"></canvas>
+    <button class="sticky-del-float" title="刪除便利貼">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   `;
 
   el.querySelector('.sticky-title').addEventListener('pointerdown', e => e.stopPropagation());
@@ -1613,23 +1656,24 @@ function createStickyDOM(s) {
   }
 
   // Delete
-  el.querySelector('.sticky-del').addEventListener('pointerdown', e => {
+  el.querySelector('.sticky-del-float').addEventListener('pointerdown', e => {
     e.stopPropagation();
     state.stickies = state.stickies.filter(st => st.id !== s.id);
     el.remove();
     snapshot();
   });
 
-  // Drag
-  attachDragEvents(el, s);
+  // Drag — handle only
+  attachDragEvents(el, s, el.querySelector('.sticky-drag-handle'));
   canvasEl.appendChild(el);
   return el;
 }
 
-function attachDragEvents(el, item) {
+function attachDragEvents(el, item, handleEl) {
+  if (!handleEl) handleEl = el;
   let dragging = false, dragStartX, dragStartY, origX, origY;
-  el.addEventListener('pointerdown', e => {
-    if (e.target.tagName === 'CANVAS' || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+  handleEl.addEventListener('pointerdown', e => {
+    e.stopPropagation();
     el.setPointerCapture(e.pointerId);
     dragStartX = e.clientX; dragStartY = e.clientY;
     origX = item.x; origY = item.y;
