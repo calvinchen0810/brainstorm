@@ -107,6 +107,18 @@
 
   .tb-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 
+  @media (max-width: 599px) {
+    #toolbar {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      touch-action: pan-x;
+    }
+    #toolbar::-webkit-scrollbar { display: none; }
+    .tb-right { margin-left: 0; }
+  }
+
   /* ── CANVAS ── */
   #canvas-container {
     position: fixed;
