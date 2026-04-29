@@ -231,7 +231,11 @@
     color: var(--text);
     word-break: break-word;
     white-space: pre-wrap;
-    min-height: 28px;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
   }
   .node-body[contenteditable="true"] {
     outline: none;
@@ -255,31 +259,26 @@
   .node:hover .node-drag-handle { opacity: 1; }
   .node-drag-handle svg { display: block; }
 
-  .node-actions {
-    display: flex;
-    padding: 4px 6px;
-    gap: 2px;
-    border-top: 1px solid var(--node-border);
-    opacity: 0;
-    transition: opacity 0.15s;
-  }
-  .node:hover .node-actions, .node.selected .node-actions { opacity: 1; }
-
-  .node-btn {
+  .node-del-float {
+    position: absolute;
+    right: -10px; bottom: -10px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dimmer);
     display: flex; align-items: center; justify-content: center;
-    width: 24px; height: 24px;
-    border-radius: 4px;
-    background: transparent;
-    border: none;
-    color: var(--text-dim);
     cursor: pointer;
+    opacity: 0;
     transition: all 0.15s;
+    z-index: 5;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
     -webkit-tap-highlight-color: transparent;
   }
-  .node-btn:hover { background: var(--surface2); color: var(--text); }
-  .node-btn.connect-btn:hover { color: var(--accent2); }
-  .node-btn.del-btn:hover { color: var(--accent3); }
-  .node-btn svg { width: 13px; height: 13px; }
+  .node:hover .node-del-float,
+  .node.selected .node-del-float { opacity: 1; }
+  .node-del-float:hover { background: rgba(255,107,107,0.08); border-color: rgba(255,107,107,0.4); color: var(--accent3); }
+  .node-del-float svg { width: 10px; height: 10px; pointer-events: none; }
 
   /* ── PORT ANCHORS ── */
   .port {
@@ -342,13 +341,21 @@
     background: rgba(255,220,0,0.05);
     border-bottom: 1px solid var(--sticky-yellow-border);
   }
-  .sticky-label {
+  .sticky-title {
+    flex: 1;
     font-size: 10px;
-    color: rgba(160,120,0,0.5);
-    letter-spacing: 0.1em;
+    color: rgba(120,90,0,0.75);
+    letter-spacing: 0.08em;
     font-family: var(--font-display);
     font-weight: 600;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 0;
+    min-width: 0;
+    cursor: text;
   }
+  .sticky-title::placeholder { color: rgba(160,120,0,0.3); }
   .sticky-del {
     background: transparent; border: none;
     color: rgba(160,120,0,0.35); cursor: pointer;
@@ -1090,14 +1097,9 @@ function createNodeDOM(n) {
       <div class="node-drag-handle" title="拖曳移動"><svg viewBox="0 0 12 12" fill="currentColor" width="12" height="12"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="10" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="10" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/><circle cx="10" cy="10" r="1.1"/></svg></div>
     </div>
     <div class="node-body" contenteditable="false" data-placeholder="輸入內容…">${escHtml(n.text)}</div>
-    <div class="node-actions">
-      <button class="node-btn edit-btn" title="編輯文字">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-      </button>
-      <button class="node-btn del-btn" title="刪除節點">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
+    <button class="node-del-float" title="刪除節點">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   `;
 
   attachNodeEvents(el, n);
@@ -1115,7 +1117,7 @@ function attachNodeEvents(el, n) {
   let longPressTimer;
 
   el.addEventListener('pointerdown', e => {
-    if (e.target.closest('.node-actions') || e.target.closest('[contenteditable="true"]')) return;
+    if (e.target.closest('button') || e.target.closest('[contenteditable="true"]')) return;
     if (e.target.classList.contains('port')) return;
 
     pointerDownTime = Date.now();
@@ -1314,12 +1316,7 @@ function attachNodeEvents(el, n) {
     });
   });
 
-  el.querySelector('.edit-btn').addEventListener('pointerdown', e => {
-    e.stopPropagation();
-    startEdit(el, n);
-  });
-
-  el.querySelector('.del-btn').addEventListener('pointerdown', e => {
+  el.querySelector('.node-del-float').addEventListener('pointerdown', e => {
     e.stopPropagation();
     deleteNode(n.id);
   });
@@ -1593,13 +1590,19 @@ function createStickyDOM(s) {
   el.style.top  = s.y + 'px';
   el.innerHTML = `
     <div class="sticky-header">
-      <span class="sticky-label">MEMO</span>
+      <input class="sticky-title" placeholder="標題…" value="${escHtml(s.title || '')}">
       <button class="sticky-del">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
     <canvas width="${MEMO_PX_W}" height="${MEMO_PX_H}"></canvas>
   `;
+
+  el.querySelector('.sticky-title').addEventListener('pointerdown', e => e.stopPropagation());
+  el.querySelector('.sticky-title').addEventListener('input', e => {
+    s.title = e.target.value;
+    snapshot();
+  });
 
   const cvs = el.querySelector('canvas');
   const ctx2 = cvs.getContext('2d');
@@ -1626,7 +1629,7 @@ function createStickyDOM(s) {
 function attachDragEvents(el, item) {
   let dragging = false, dragStartX, dragStartY, origX, origY;
   el.addEventListener('pointerdown', e => {
-    if (e.target.tagName === 'CANVAS' || e.target.tagName === 'BUTTON') return;
+    if (e.target.tagName === 'CANVAS' || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
     el.setPointerCapture(e.pointerId);
     dragStartX = e.clientX; dragStartY = e.clientY;
     origX = item.x; origY = item.y;
