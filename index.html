@@ -547,6 +547,30 @@
     transform: translate(-50%, -50%);
   }
 
+  .hw-label { display: none; }
+  @media (min-width: 600px) {
+    .hw-btn.hw-icon-btn { width: auto; padding: 0 12px; }
+    .hw-label { display: inline; }
+  }
+
+  #toolbar-handle {
+    position: fixed;
+    top: var(--toolbar-h);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 0 0 4px 4px;
+    z-index: 999;
+    cursor: ew-resize;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
+  }
+  #toolbar-handle:hover,
+  #toolbar-handle:active { background: var(--border-active); }
+
   #hw-canvas {
     display: block;
     touch-action: none;
@@ -851,6 +875,7 @@
     </button>
   </div>
 </div>
+<div id="toolbar-handle" title="拖曳捲動工具列"></div>
 
 <!-- CANVAS -->
 <div id="canvas-container">
@@ -898,23 +923,29 @@
     </div>
     <button class="hw-btn hw-icon-btn" id="hw-eraser" title="橡皮擦">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+      <span class="hw-label">橡皮擦</span>
     </button>
     <button class="hw-btn hw-icon-btn" id="hw-clear" title="清除畫布">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      <span class="hw-label">清除</span>
     </button>
     <button class="hw-btn hw-icon-btn" id="hw-undo" title="復原" style="opacity:0.35;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+      <span class="hw-label">復原</span>
     </button>
     <button class="hw-btn hw-icon-btn" id="hw-redo" title="重做" style="opacity:0.35;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+      <span class="hw-label">重做</span>
     </button>
     <button class="hw-btn" id="hw-zoom" title="切換縮放倍率">2x</button>
     <div style="margin-left:auto;display:flex;gap:8px;flex-shrink:0;">
       <button class="hw-btn hw-icon-btn" id="hw-cancel" title="取消">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <span class="hw-label">取消</span>
       </button>
       <button class="hw-btn hw-icon-btn primary" id="hw-confirm" title="貼上便利貼">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="hw-label">貼上</span>
       </button>
     </div>
   </div>
@@ -2187,6 +2218,24 @@ document.getElementById('btn-undo').addEventListener('pointerdown', undo);
 document.getElementById('btn-redo').addEventListener('pointerdown', redo);
 
 document.getElementById('btn-fit').addEventListener('pointerdown', fitAll);
+
+// Toolbar drag handle — scroll toolbar without touching buttons
+(function() {
+  const handle  = document.getElementById('toolbar-handle');
+  const toolbar = document.getElementById('toolbar');
+  let startX = null, scrollStart = 0;
+  handle.addEventListener('pointerdown', e => {
+    handle.setPointerCapture(e.pointerId);
+    startX = e.clientX;
+    scrollStart = toolbar.scrollLeft;
+  });
+  handle.addEventListener('pointermove', e => {
+    if (startX === null) return;
+    toolbar.scrollLeft = scrollStart - (e.clientX - startX);
+  });
+  handle.addEventListener('pointerup',     () => { startX = null; });
+  handle.addEventListener('pointercancel', () => { startX = null; });
+})();
 
 document.getElementById('btn-clear').addEventListener('click', () => {
   if (confirm('確定要清空畫布？此操作無法復原。')) clearCanvas();
