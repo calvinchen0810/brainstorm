@@ -402,18 +402,10 @@
     touch-action: pan-x;
   }
   #hw-toolbar::-webkit-scrollbar { display: none; }
-  #hw-toolbar .hw-title {
-    font-family: var(--font-display);
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    color: var(--text-dim);
-    margin-right: 8px;
-  }
 
   #hw-color-picker { position: relative; flex-shrink: 0; }
   #hw-color-btn {
-    width: 32px; height: 32px;
+    width: 40px; height: 40px;
     border-radius: var(--radius);
     border: 1px solid var(--border);
     background: transparent;
@@ -424,7 +416,7 @@
   }
   #hw-color-btn:hover { border-color: var(--text-dim); }
   #hw-color-preview {
-    width: 16px; height: 16px;
+    width: 18px; height: 18px;
     border-radius: 50%;
     background: #1a1a2e;
     transition: background 0.15s;
@@ -446,7 +438,7 @@
   #hw-color-popup.open { display: flex; }
 
   .hw-color {
-    width: 22px; height: 22px;
+    width: 26px; height: 26px;
     border-radius: 50%;
     border: 2px solid transparent;
     cursor: pointer;
@@ -476,15 +468,16 @@
   }
 
   .hw-btn {
-    height: 32px; padding: 0 12px;
+    height: 40px; padding: 0 14px;
     border-radius: var(--radius);
     border: 1px solid var(--border);
     background: transparent;
     color: var(--text-dim);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 12px;
     cursor: pointer;
     transition: all 0.15s;
+    flex-shrink: 0;
   }
   .hw-btn:hover { background: var(--surface2); color: var(--text); }
   .hw-btn.primary {
@@ -495,10 +488,10 @@
   .hw-btn.primary:hover { background: rgba(0,229,255,0.2); }
 
   .hw-btn.hw-icon-btn {
-    width: 32px; padding: 0;
+    width: 40px; padding: 0;
     display: flex; align-items: center; justify-content: center;
   }
-  .hw-btn.hw-icon-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .hw-btn.hw-icon-btn svg { width: 17px; height: 17px; flex-shrink: 0; }
 
   #hw-canvas-wrap { position: relative; }
 
@@ -853,7 +846,6 @@
     <div class="hw-color" style="background:#6b44e0" data-color="#6b44e0"></div>
   </div>
   <div id="hw-toolbar">
-    <span class="hw-title">手寫記錄</span>
     <div id="hw-color-picker">
       <button id="hw-color-btn" title="筆刷顏色"><div id="hw-color-preview"></div></button>
     </div>
@@ -868,12 +860,20 @@
     <button class="hw-btn hw-icon-btn" id="hw-clear" title="清除畫布">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
     </button>
-    <button class="hw-btn" id="hw-undo" title="復原" style="opacity:0.35;">↩ 復原</button>
-    <button class="hw-btn" id="hw-redo" title="重做" style="opacity:0.35;">↪ 重做</button>
+    <button class="hw-btn hw-icon-btn" id="hw-undo" title="復原" style="opacity:0.35;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+    </button>
+    <button class="hw-btn hw-icon-btn" id="hw-redo" title="重做" style="opacity:0.35;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+    </button>
     <button class="hw-btn" id="hw-zoom" title="切換縮放倍率">2x</button>
-    <div style="margin-left:auto;display:flex;gap:8px;">
-      <button class="hw-btn" id="hw-cancel">取消</button>
-      <button class="hw-btn primary" id="hw-confirm">貼上</button>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-shrink:0;">
+      <button class="hw-btn hw-icon-btn" id="hw-cancel" title="取消">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <button class="hw-btn hw-icon-btn primary" id="hw-confirm" title="貼上便利貼">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
     </div>
   </div>
   <div id="hw-canvas-wrap">
@@ -1750,8 +1750,8 @@ hwColorBtn.addEventListener('pointerdown', e => {
   if (isOpen) {
     const br = hwColorBtn.getBoundingClientRect();
     hwColorPopup.style.top  = (br.bottom + 8) + 'px';
-    hwColorPopup.style.left = (br.left + br.width / 2) + 'px';
-    hwColorPopup.style.transform = 'translateX(-50%)';
+    hwColorPopup.style.left = Math.max(8, br.left) + 'px';
+    hwColorPopup.style.transform = 'none';
   }
 });
 
