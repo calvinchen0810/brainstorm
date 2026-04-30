@@ -97,7 +97,7 @@
   .tb-btn.active { background: rgba(0,229,255,0.08); border-color: rgba(0,229,255,0.3); color: var(--accent); }
   .tb-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
   .tb-btn .label { display: none; }
-  @media (min-width: 600px) { .tb-btn .label { display: inline; } }
+  @media (min-width: 900px) { .tb-btn .label { display: inline; } }
 
   .tb-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
 
@@ -107,7 +107,7 @@
 
   .tb-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 
-  @media (max-width: 599px) {
+  @media (max-width: 1024px) {
     #toolbar {
       overflow-x: auto;
       overflow-y: hidden;
@@ -219,7 +219,7 @@
     flex-shrink: 0;
     transition: background 0.2s;
   }
-  .node.selected .node-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+      padding: 8px 16px;
 
   .node-color-dot { cursor: pointer; }
   .node-color-dot:hover { transform: scale(1.3); }
@@ -228,7 +228,8 @@
     padding: 8px 10px;
     font-size: 13px;
     line-height: 1.5;
-    color: var(--text);
+    padding: 8px 16px;
+    bottom: 8px;
     word-break: break-word;
     white-space: pre-wrap;
     min-height: 52px;
@@ -434,7 +435,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 16px;
+    padding: 8px 16px;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     overflow-x: auto;
@@ -442,8 +444,17 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     touch-action: pan-x;
+    position: relative;
   }
   #hw-toolbar::-webkit-scrollbar { display: none; }
+
+  #hw-toolbar-handle {
+    position: fixed;
+    top: calc(var(--toolbar-h) + 1px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2100;
+  }
 
   #hw-color-picker { position: relative; flex-shrink: 0; }
   #hw-color-btn {
@@ -553,23 +564,43 @@
     .hw-label { display: inline; }
   }
 
+  #toolbar-handle,
+  .toolbar-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 24px;
+    height: 20px;
+    cursor: ew-resize;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s;
+    opacity: 0.4;
+    flex-shrink: 0;
+  }
+  #toolbar-handle:hover,
+  #toolbar-handle:active,
+  .toolbar-drag-handle:hover,
+  .toolbar-drag-handle:active { opacity: 1; }
+
+  .handle-hidden { display: none !important; }
+
   #toolbar-handle {
     position: fixed;
     top: var(--toolbar-h);
     left: 50%;
     transform: translateX(-50%);
-    width: 40px;
-    height: 6px;
-    background: var(--border);
-    border-radius: 0 0 4px 4px;
     z-index: 999;
-    cursor: ew-resize;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 0.15s;
   }
-  #toolbar-handle:hover,
-  #toolbar-handle:active { background: var(--border-active); }
+
+  .toolbar-handle-dot {
+    width: 2px;
+    height: 12px;
+    border-radius: 1px;
+    background: var(--text-dimmer);
+    flex-shrink: 0;
+  }
 
   #hw-canvas {
     display: block;
@@ -587,6 +618,8 @@
   #ctx-menu {
     display: none;
     position: fixed;
+    top: 0;
+    left: 0;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -880,7 +913,13 @@
     </button>
   </div>
 </div>
-<div id="toolbar-handle" title="拖曳捲動工具列"></div>
+<div id="toolbar-handle" title="拖曳捲動工具列">
+  <div class="toolbar-handle-dot"></div>
+  <div class="toolbar-handle-dot"></div>
+  <div class="toolbar-handle-dot"></div>
+  <div class="toolbar-handle-dot"></div>
+  <div class="toolbar-handle-dot"></div>
+</div>
 
 <!-- CANVAS -->
 <div id="canvas-container">
@@ -952,6 +991,13 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
         <span class="hw-label">貼上</span>
       </button>
+    </div>
+    <div id="hw-toolbar-handle" class="toolbar-drag-handle" title="拖曳捲動工具列">
+      <div class="toolbar-handle-dot"></div>
+      <div class="toolbar-handle-dot"></div>
+      <div class="toolbar-handle-dot"></div>
+      <div class="toolbar-handle-dot"></div>
+      <div class="toolbar-handle-dot"></div>
     </div>
   </div>
   <div id="hw-canvas-wrap">
@@ -1181,6 +1227,10 @@ function rebuildDOM() {
   state.stickies.forEach(s => createStickyDOM(s));
   state.connections.forEach(c => createConnLine(c));
   updateMinimap();
+  // Update handle visibility after DOM changes
+  if (window.updateHandleVisibility) {
+    setTimeout(() => window.updateHandleVisibility(), 0);
+  }
 }
 
 const nodeColors = {
@@ -1835,6 +1885,12 @@ function openHWOverlay(stickyId = null, width = STICKY_WIDTH_DEFAULT) {
   hwTargetId = stickyId;
   hwPendingWidth = width;
   hwOverlay.classList.add('active');
+  // Overlay starts hidden; recalc handle visibility after layout is visible.
+  if (window.updateHandleVisibility) {
+    requestAnimationFrame(() => window.updateHandleVisibility());
+    requestAnimationFrame(() => requestAnimationFrame(() => window.updateHandleVisibility()));
+    setTimeout(() => window.updateHandleVisibility(), 120);
+  }
 
   if (stickyId) {
     const sticky = state.stickies.find(s => s.id === stickyId);
@@ -1867,13 +1923,16 @@ function openHWOverlay(stickyId = null, width = STICKY_WIDTH_DEFAULT) {
       img.onload = () => {
         hwCtx.drawImage(img, 0, 0, memoCssWidth, MEMO_CSS_H);
         hwSaveState();
+        if (window.updateHandleVisibility) window.updateHandleVisibility();
       };
       img.src = sticky.dataURL;
     } else {
       hwSaveState();
+      if (window.updateHandleVisibility) window.updateHandleVisibility();
     }
   } else {
     hwSaveState();
+    if (window.updateHandleVisibility) window.updateHandleVisibility();
   }
 }
 
@@ -2035,10 +2094,28 @@ document.getElementById('hw-confirm').addEventListener('pointerdown', () => {
   showToast('便利貼已貼上');
 });
 
-// Double tap sticky to edit
-canvasEl.addEventListener('dblclick', e => {
+// Double tap / double click sticky to edit (works on mobile touch too)
+let lastStickyTap = { id: null, t: 0, x: 0, y: 0 };
+canvasEl.addEventListener('pointerup', e => {
   const stickyEl = e.target.closest('.sticky');
-  if (stickyEl) openHWOverlay(stickyEl.dataset.id);
+  if (!stickyEl) return;
+  if (e.target.closest('.sticky-title, .sticky-drag-handle, .sticky-del-float')) return;
+  if (hwOverlay.classList.contains('active')) return;
+  if (wasPinching || activePointers.size >= 2) return;
+
+  const now = Date.now();
+  const dx = e.clientX - lastStickyTap.x;
+  const dy = e.clientY - lastStickyTap.y;
+  const sameSticky = lastStickyTap.id === stickyEl.dataset.id;
+  const closeEnough = (dx * dx + dy * dy) < (18 * 18);
+
+  if (sameSticky && closeEnough && now - lastStickyTap.t < 320) {
+    openHWOverlay(stickyEl.dataset.id);
+    lastStickyTap = { id: null, t: 0, x: 0, y: 0 };
+    return;
+  }
+
+  lastStickyTap = { id: stickyEl.dataset.id, t: now, x: e.clientX, y: e.clientY };
 });
 
 // ── VIEWPORT PAN & ZOOM ───────────────────────────────────────────────
@@ -2296,20 +2373,71 @@ document.getElementById('btn-fit').addEventListener('pointerdown', fitAll);
 
 // Toolbar drag handle — scroll toolbar without touching buttons
 (function() {
-  const handle  = document.getElementById('toolbar-handle');
-  const toolbar = document.getElementById('toolbar');
-  let startX = null, scrollStart = 0;
-  handle.addEventListener('pointerdown', e => {
-    handle.setPointerCapture(e.pointerId);
-    startX = e.clientX;
-    scrollStart = toolbar.scrollLeft;
-  });
-  handle.addEventListener('pointermove', e => {
-    if (startX === null) return;
-    toolbar.scrollLeft = scrollStart - (e.clientX - startX);
-  });
-  handle.addEventListener('pointerup',     () => { startX = null; });
-  handle.addEventListener('pointercancel', () => { startX = null; });
+  function bindToolbarDrag(handleId, toolbarId) {
+    const handle = document.getElementById(handleId);
+    const toolbar = document.getElementById(toolbarId);
+    if (!handle || !toolbar) return;
+
+    let startX = null;
+    let scrollStart = 0;
+
+    handle.addEventListener('pointerdown', e => {
+      handle.setPointerCapture(e.pointerId);
+      startX = e.clientX;
+      scrollStart = toolbar.scrollLeft;
+    });
+
+    handle.addEventListener('pointermove', e => {
+      if (startX === null) return;
+      toolbar.scrollLeft = scrollStart - (e.clientX - startX);
+    });
+
+    handle.addEventListener('pointerup', () => { startX = null; });
+    handle.addEventListener('pointercancel', () => { startX = null; });
+  }
+
+  bindToolbarDrag('toolbar-handle', 'toolbar');
+  bindToolbarDrag('hw-toolbar-handle', 'hw-toolbar');
+
+  // Show/hide drag handles based on scroll necessity
+  window.updateHandleVisibility = function() {
+    const toolbars = [
+      { handleId: 'toolbar-handle', toolbarId: 'toolbar' },
+      { handleId: 'hw-toolbar-handle', toolbarId: 'hw-toolbar' }
+    ];
+    
+    toolbars.forEach(({ handleId, toolbarId }) => {
+      const handle = document.getElementById(handleId);
+      const toolbar = document.getElementById(toolbarId);
+      if (!handle || !toolbar) return;
+      
+      // Show handle only if scrolling is needed
+      const needsScroll = toolbar.scrollWidth > toolbar.clientWidth;
+      if (needsScroll) {
+        handle.classList.remove('handle-hidden');
+      } else {
+        handle.classList.add('handle-hidden');
+      }
+    });
+  };
+  
+  // Check on init
+  window.updateHandleVisibility();
+  
+  // Check on resize and content changes
+  window.addEventListener('resize', window.updateHandleVisibility);
+  window.addEventListener('orientationchange', window.updateHandleVisibility);
+  // Also check when window loads completely (images, etc.)
+  window.addEventListener('load', window.updateHandleVisibility);
+
+  // Keep handle visibility in sync with actual toolbar size/content changes.
+  if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver(() => window.updateHandleVisibility());
+    const tb = document.getElementById('toolbar');
+    const hwtb = document.getElementById('hw-toolbar');
+    if (tb) ro.observe(tb);
+    if (hwtb) ro.observe(hwtb);
+  }
 })();
 
 document.getElementById('btn-clear').addEventListener('click', () => {
