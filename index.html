@@ -835,6 +835,11 @@
     <span class="label">便利貼</span>
   </button>
 
+  <button class="tb-btn" id="btn-sticky-wide" title="新增兩倍寬手寫便利貼">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/></svg>
+    <span class="label">寬便利貼</span>
+  </button>
+
   <div class="tb-sep"></div>
 
   <button class="tb-btn" id="btn-undo" title="復原 (Ctrl+Z)">
@@ -965,6 +970,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
     新增便利貼
   </button>
+  <button class="ctx-item" id="ctx-add-sticky-wide">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/></svg>
+    新增兩倍寬便利貼
+  </button>
   <div class="ctx-sep"></div>
   <button class="ctx-item danger" id="ctx-clear">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
@@ -1039,8 +1048,45 @@ const MEMO_CSS_W = MEMO_STICKY_SIZE - MEMO_STICKY_BORDER * 2;
 const MEMO_CSS_H = MEMO_STICKY_SIZE - MEMO_STICKY_BORDER * 2 - MEMO_HEADER_HEIGHT;
 const MEMO_PX_W = MEMO_CSS_W * 2;
 const MEMO_PX_H = MEMO_CSS_H * 2;
+const STICKY_WIDTH_DEFAULT = 1;
+const STICKY_WIDTH_DOUBLE = 2;
 const MEMO_EDIT_ZOOMS = [1, 2, 3];
 let hwEditZoom = 2;
+
+function getAvailableZooms() {
+  const wrap = document.getElementById('hw-canvas-wrap');
+  if (!wrap) return MEMO_EDIT_ZOOMS;
+  const maxWidth = wrap.clientWidth - 24; // padding buffer
+  const canvasWidth = getStickyCanvasCssWidth({width: hwPendingWidth});
+  return MEMO_EDIT_ZOOMS.filter(zoom => canvasWidth * zoom <= maxWidth);
+}
+
+function getStickyWidthUnits(sticky) {
+  return sticky?.width === STICKY_WIDTH_DOUBLE ? STICKY_WIDTH_DOUBLE : STICKY_WIDTH_DEFAULT;
+}
+
+function getStickyOuterWidth(sticky) {
+  return MEMO_STICKY_SIZE * getStickyWidthUnits(sticky);
+}
+
+function getStickyCanvasCssWidth(sticky) {
+  return getStickyOuterWidth(sticky) - MEMO_STICKY_BORDER * 2;
+}
+
+function getStickyCanvasPxWidth(sticky) {
+  return getStickyCanvasCssWidth(sticky) * 2;
+}
+
+function getStickyOuterHeight() {
+  return MEMO_STICKY_SIZE;
+}
+
+function getStickyBounds(sticky) {
+  return {
+    width: getStickyOuterWidth(sticky),
+    height: getStickyOuterHeight()
+  };
+}
 
 // Viewport transform
 let vx = 0, vy = 0, vscale = 1;
@@ -1661,12 +1707,14 @@ function createStickyDOM(s) {
   el.dataset.id = s.id;
   el.style.left = s.x + 'px';
   el.style.top  = s.y + 'px';
+  el.style.width = getStickyOuterWidth(s) + 'px';
+  const stickyCanvasPxWidth = getStickyCanvasPxWidth(s);
   el.innerHTML = `
     <div class="sticky-header">
       <input class="sticky-title" placeholder="標題…" value="${escHtml(s.title || '')}">
       <div class="sticky-drag-handle" title="拖曳移動"><svg viewBox="0 0 12 12" fill="currentColor" width="12" height="12"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="10" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="10" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/><circle cx="10" cy="10" r="1.1"/></svg></div>
     </div>
-    <canvas width="${MEMO_PX_W}" height="${MEMO_PX_H}"></canvas>
+    <canvas width="${stickyCanvasPxWidth}" height="${MEMO_PX_H}"></canvas>
     <button class="sticky-del-float" title="刪除便利貼">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
@@ -1740,6 +1788,7 @@ document.getElementById('hw-color-preview').style.background = hwColor;
 let hwEraser = false;
 let hwDrawing = false;
 let hwTargetId = null; // sticky id to update
+let hwPendingWidth = STICKY_WIDTH_DEFAULT;
 let hwHistory = [];
 let hwHistIdx = -1;
 const HW_MAX_HIST = 40;
@@ -1773,7 +1822,7 @@ function hwUpdateUndoRedo() {
 }
 
 function hwApplyZoom() {
-  hwCanvas.style.width = MEMO_CSS_W * hwEditZoom + 'px';
+  hwCanvas.style.width = getStickyCanvasCssWidth({width: hwPendingWidth}) * hwEditZoom + 'px';
   hwCanvas.style.height = MEMO_CSS_H * hwEditZoom + 'px';
 }
 
@@ -1782,19 +1831,31 @@ function hwUpdateZoomBtn() {
   if (btn) btn.textContent = hwEditZoom + 'x';
 }
 
-function openHWOverlay(stickyId = null) {
+function openHWOverlay(stickyId = null, width = STICKY_WIDTH_DEFAULT) {
   hwTargetId = stickyId;
+  hwPendingWidth = width;
   hwOverlay.classList.add('active');
 
+  if (stickyId) {
+    const sticky = state.stickies.find(s => s.id === stickyId);
+    hwPendingWidth = getStickyWidthUnits(sticky);
+  }
+
+  const memoCssWidth = getStickyCanvasCssWidth({width: hwPendingWidth});
+  const memoPxWidth = getStickyCanvasPxWidth({width: hwPendingWidth});
+
   // Keep edit mode drawing area exactly the same as sticky view mode.
-  hwCanvas.width = MEMO_PX_W;
+  hwCanvas.width = memoPxWidth;
   hwCanvas.height = MEMO_PX_H;
   // Show edit canvas at selectable zoom for easier finger/stylus input.
+  // Use maximum available zoom that fits in container
+  const availableZooms = getAvailableZooms();
+  hwEditZoom = availableZooms.length > 0 ? availableZooms[availableZooms.length - 1] : MEMO_EDIT_ZOOMS[0];
   hwApplyZoom();
   hwUpdateZoomBtn();
   hwCtx.scale(2, 2);
   hwCtx.fillStyle = '#fffbe6';
-  hwCtx.fillRect(0, 0, MEMO_CSS_W, MEMO_CSS_H);
+  hwCtx.fillRect(0, 0, memoCssWidth, MEMO_CSS_H);
 
   // Reset history
   hwHistory = [];
@@ -1804,7 +1865,7 @@ function openHWOverlay(stickyId = null) {
     if (sticky?.dataURL) {
       const img = new Image();
       img.onload = () => {
-        hwCtx.drawImage(img, 0, 0, MEMO_CSS_W, MEMO_CSS_H);
+        hwCtx.drawImage(img, 0, 0, memoCssWidth, MEMO_CSS_H);
         hwSaveState();
       };
       img.src = sticky.dataURL;
@@ -1875,9 +1936,14 @@ document.getElementById('hw-clear').addEventListener('pointerdown', () => {
 document.getElementById('hw-undo').addEventListener('pointerdown', () => hwUndo());
 document.getElementById('hw-redo').addEventListener('pointerdown', () => hwRedo());
 document.getElementById('hw-zoom').addEventListener('pointerdown', () => {
-  const idx = MEMO_EDIT_ZOOMS.indexOf(hwEditZoom);
-  const nextIdx = (idx + 1) % MEMO_EDIT_ZOOMS.length;
-  hwEditZoom = MEMO_EDIT_ZOOMS[nextIdx];
+  const availableZooms = getAvailableZooms();
+  if (availableZooms.length <= 1) {
+    showToast('只能使用 ' + availableZooms[0] + 'x 縮放', 900);
+    return;
+  }
+  const idx = availableZooms.indexOf(hwEditZoom);
+  const nextIdx = (idx + 1) % availableZooms.length;
+  hwEditZoom = availableZooms[nextIdx];
   hwApplyZoom();
   hwUpdateZoomBtn();
   showToast('編輯縮放：' + hwEditZoom + 'x', 900);
@@ -1958,8 +2024,9 @@ document.getElementById('hw-confirm').addEventListener('pointerdown', () => {
     }
   } else {
     // new sticky
-    const cp = screenToCanvas(window.innerWidth/2 - 100, (window.innerHeight - 60)/2 - 100);
-    const sticky = {id: genId(), x: cp.x, y: cp.y, dataURL};
+    const stickyWidth = getStickyOuterWidth({width: hwPendingWidth});
+    const cp = screenToCanvas(window.innerWidth/2 - stickyWidth / 2, (window.innerHeight - 60)/2 - 100);
+    const sticky = {id: genId(), x: cp.x, y: cp.y, dataURL, width: hwPendingWidth};
     state.stickies.push(sticky);
     createStickyDOM(sticky);
   }
@@ -2159,7 +2226,11 @@ document.getElementById('ctx-add-node').addEventListener('pointerdown', () => {
 });
 document.getElementById('ctx-add-sticky').addEventListener('pointerdown', () => {
   hideCtxMenu();
-  openHWOverlay(null);
+  openHWOverlay(null, STICKY_WIDTH_DEFAULT);
+});
+document.getElementById('ctx-add-sticky-wide').addEventListener('pointerdown', () => {
+  hideCtxMenu();
+  openHWOverlay(null, STICKY_WIDTH_DOUBLE);
 });
 document.getElementById('ctx-clear').addEventListener('pointerdown', () => {
   hideCtxMenu();
@@ -2211,7 +2282,11 @@ document.getElementById('btn-add-node').addEventListener('pointerdown', () => {
 });
 
 document.getElementById('btn-sticky').addEventListener('pointerdown', () => {
-  openHWOverlay(null);
+  openHWOverlay(null, STICKY_WIDTH_DEFAULT);
+});
+
+document.getElementById('btn-sticky-wide').addEventListener('pointerdown', () => {
+  openHWOverlay(null, STICKY_WIDTH_DOUBLE);
 });
 
 document.getElementById('btn-undo').addEventListener('pointerdown', undo);
@@ -2256,10 +2331,11 @@ function fitAll() {
   if (!all.length) return;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   all.forEach(item => {
+    const bounds = state.stickies.includes(item) ? getStickyBounds(item) : {width: 220, height: 120};
     minX = Math.min(minX, item.x);
     minY = Math.min(minY, item.y);
-    maxX = Math.max(maxX, item.x + 220);
-    maxY = Math.max(maxY, item.y + 120);
+    maxX = Math.max(maxX, item.x + bounds.width);
+    maxY = Math.max(maxY, item.y + bounds.height);
   });
   const W = container.clientWidth, H = container.clientHeight;
   const scaleX = W / (maxX - minX + 120);
@@ -2429,10 +2505,11 @@ function updateMinimap() {
   if (!all.length) return;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   all.forEach(item => {
+    const bounds = state.stickies.includes(item) ? getStickyBounds(item) : {width: 200, height: 120};
     minX = Math.min(minX, item.x);
     minY = Math.min(minY, item.y);
-    maxX = Math.max(maxX, item.x + 200);
-    maxY = Math.max(maxY, item.y + 120);
+    maxX = Math.max(maxX, item.x + bounds.width);
+    maxY = Math.max(maxY, item.y + bounds.height);
   });
   const rangeX = maxX - minX || 1, rangeY = maxY - minY || 1;
   const scale = Math.min(W / rangeX, H / rangeY) * 0.85;
@@ -2445,7 +2522,13 @@ function updateMinimap() {
   });
   state.stickies.forEach(s => {
     mmCtx.fillStyle = 'rgba(255,220,0,0.4)';
-    mmCtx.fillRect(offX + (s.x - minX)*scale, offY + (s.y - minY)*scale, 12*scale, 12*scale);
+    const bounds = getStickyBounds(s);
+    mmCtx.fillRect(
+      offX + (s.x - minX) * scale,
+      offY + (s.y - minY) * scale,
+      Math.max(12, bounds.width * 0.06) * scale,
+      Math.max(12, bounds.height * 0.06) * scale
+    );
   });
 
   // viewport rect
