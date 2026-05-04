@@ -206,33 +206,35 @@
   }
 
   .node-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 10px 6px;
-    border-bottom: 1px solid var(--node-border);
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    right: 10px;
+    height: 14px;
+    z-index: 2;
+    pointer-events: none;
   }
   .node-dot {
     width: 8px; height: 8px;
     border-radius: 50%;
     background: var(--accent);
+    position: absolute;
+    left: 0;
+    top: 3px;
     flex-shrink: 0;
     transition: background 0.2s;
   }
-      padding: 8px 16px;
 
-  .node-color-dot { cursor: pointer; }
+  .node-color-dot { cursor: pointer; pointer-events: auto; }
   .node-color-dot:hover { transform: scale(1.3); }
 
   .node-body {
-    padding: 8px 10px;
+    padding: 16px;
     font-size: 13px;
     line-height: 1.5;
-    padding: 8px 16px;
-    bottom: 8px;
     word-break: break-word;
     white-space: pre-wrap;
-    min-height: 52px;
+    min-height: 68px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -248,23 +250,10 @@
     font-style: italic;
   }
 
-  .node-title {
-    flex: 1;
-    font-size: 9px;
-    color: var(--text-dimmer);
-    letter-spacing: .08em;
-    font-family: var(--font-display);
-    font-weight: 600;
-    background: transparent;
-    border: none;
-    outline: none;
-    padding: 0;
-    min-width: 0;
-    cursor: text;
-  }
-  .node-title::placeholder { color: var(--text-dimmer); opacity: 0.4; }
-
   .node-drag-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
     width: 14px; height: 14px;
     color: var(--text-dimmer);
     opacity: 0;
@@ -272,6 +261,8 @@
     flex-shrink: 0;
     cursor: grab;
     display: flex; align-items: center; justify-content: center;
+    z-index: 2;
+    pointer-events: auto;
   }
   .node:hover .node-drag-handle { opacity: 1; }
   .node-drag-handle svg { display: block; }
@@ -323,16 +314,18 @@
   body.connecting .port:hover { background: var(--accent2); border-color: var(--accent2); transform: scale(1.4) !important; }
 
   /* ── COLOR VARIANTS ── */
-  .node[data-color="cyan"] .node-dot { background: var(--accent); }
-  .node[data-color="purple"] .node-dot { background: var(--accent2); }
-  .node[data-color="red"] .node-dot { background: var(--accent3); }
-  .node[data-color="green"] .node-dot { background: #2d9e5f; }
-  .node[data-color="orange"] .node-dot { background: #d97706; }
-  .node[data-color="cyan"] { border-color: rgba(0,119,204,0.3); }
-  .node[data-color="purple"] { border-color: rgba(107,68,224,0.3); }
-  .node[data-color="red"] { border-color: rgba(224,58,58,0.3); }
-  .node[data-color="green"] { border-color: rgba(45,158,95,0.3); }
-  .node[data-color="orange"] { border-color: rgba(217,119,6,0.3); }
+  .node[data-color="white"]  { background: #ffffff; border-color: #d8dce8; }
+  .node[data-color="blue"]   { background: #dbeafe; border-color: #bfdbfe; }
+  .node[data-color="purple"] { background: #ede9fe; border-color: #ddd6fe; }
+  .node[data-color="red"]    { background: #fee2e2; border-color: #fecaca; }
+  .node[data-color="green"]  { background: #dcfce7; border-color: #bbf7d0; }
+  .node[data-color="orange"] { background: #ffedd5; border-color: #fed7aa; }
+  .node[data-color="white"]  .node-dot { background: #9aa0b4; }
+  .node[data-color="blue"]   .node-dot { background: #3b82f6; }
+  .node[data-color="purple"] .node-dot { background: #8b5cf6; }
+  .node[data-color="red"]    .node-dot { background: #ef4444; }
+  .node[data-color="green"]  .node-dot { background: #16a34a; }
+  .node[data-color="orange"] .node-dot { background: #f97316; }
 
   /* ── STICKY NOTES ── */
   .sticky {
@@ -667,7 +660,7 @@
     transition: transform 0.15s, border-color 0.15s;
   }
   .cp-dot:hover { transform: scale(1.2); }
-  .cp-dot.active { border-color: white; }
+  .cp-dot.active { border-color: #555; }
 
   /* ── TOAST ── */
   #toast {
@@ -906,13 +899,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       <span class="label">存檔</span>
     </button>
-    <button class="tb-btn" id="btn-export-md" title="匯出 Markdown">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <span class="label">MD</span>
-    </button>
-    <button class="tb-btn" id="btn-import" title="匯入 Markdown / JSON">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      <span class="label">匯入</span>
+    <button class="tb-btn" id="btn-import" title="開啟 JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span class="label">開檔</span>
     </button>
     <button class="tb-btn danger" id="btn-clear" title="清空畫布">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -1040,14 +1029,15 @@
 
 <!-- COLOR POPUP -->
 <div id="color-popup">
-  <div class="cp-dot active" data-color="cyan" style="background:#0077cc"></div>
-  <div class="cp-dot" data-color="purple" style="background:#6b44e0"></div>
-  <div class="cp-dot" data-color="red" style="background:#e03a3a"></div>
-  <div class="cp-dot" data-color="green" style="background:#2d9e5f"></div>
-  <div class="cp-dot" data-color="orange" style="background:#d97706"></div>
+  <div class="cp-dot" data-color="white"  style="background:#ffffff"></div>
+  <div class="cp-dot active" data-color="blue"   style="background:#dbeafe"></div>
+  <div class="cp-dot" data-color="purple" style="background:#ede9fe"></div>
+  <div class="cp-dot" data-color="red"    style="background:#fee2e2"></div>
+  <div class="cp-dot" data-color="green"  style="background:#dcfce7"></div>
+  <div class="cp-dot" data-color="orange" style="background:#ffedd5"></div>
 </div>
 
-<input type="file" id="import-input" accept=".md,.json">
+<input type="file" id="import-input" accept=".json">
 
 <div id="toast"></div>
 
@@ -1246,18 +1236,19 @@ function rebuildDOM() {
 }
 
 const nodeColors = {
-  cyan:   'var(--accent)',
-  purple: 'var(--accent2)',
-  red:    'var(--accent3)',
-  green:  '#00ff88',
-  orange: '#ff9f43'
+  white:  '#ffffff',
+  blue:   '#dbeafe',
+  purple: '#ede9fe',
+  red:    '#fee2e2',
+  green:  '#dcfce7',
+  orange: '#ffedd5'
 };
 
 function createNodeDOM(n) {
   const el = document.createElement('div');
   el.className = 'node';
   el.dataset.id = n.id;
-  el.dataset.color = n.color || 'cyan';
+  el.dataset.color = n.color || 'blue';
   el.style.left = n.x + 'px';
   el.style.top  = n.y + 'px';
   el.innerHTML = `
@@ -1267,7 +1258,6 @@ function createNodeDOM(n) {
     <div class="port right"  data-port="right"></div>
     <div class="node-header">
       <div class="node-dot node-color-dot" title="更換顏色"></div>
-      <input class="node-title" placeholder="標題…" value="${escHtml(n.title || '')}">
       <div class="node-drag-handle" title="拖曳移動"><svg viewBox="0 0 12 12" fill="currentColor" width="12" height="12"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="10" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="10" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/><circle cx="10" cy="10" r="1.1"/></svg></div>
     </div>
     <div class="node-body" contenteditable="false" data-placeholder="輸入內容…">${escHtml(n.text)}</div>
@@ -1500,12 +1490,6 @@ function attachNodeEvents(el, n) {
     showColorPopup(n.id, e.clientX, e.clientY);
   });
 
-  const nodeTitleEl = el.querySelector('.node-title');
-  nodeTitleEl.addEventListener('pointerdown', e => e.stopPropagation());
-  nodeTitleEl.addEventListener('input', () => {
-    n.title = nodeTitleEl.value;
-    snapshot();
-  });
 }
 
 function selectNode(id) {
@@ -2252,7 +2236,7 @@ container.addEventListener('wheel', e => {
 
 // ── ADD NODE ─────────────────────────────────────────────────────────
 function addNode(x, y, text = '') {
-  const node = {id: genId(), x, y, text, color: 'cyan'};
+  const node = {id: genId(), x, y, text, color: 'blue'};
   state.nodes.push(node);
   const el = createNodeDOM(node);
   snapshot();
@@ -2340,7 +2324,7 @@ function showColorPopup(nodeId, sx, sy) {
   colorPopup.classList.add('active');
   const n = state.nodes.find(n => n.id === nodeId);
   colorPopup.querySelectorAll('.cp-dot').forEach(d => {
-    d.classList.toggle('active', d.dataset.color === (n?.color || 'cyan'));
+    d.classList.toggle('active', d.dataset.color === (n?.color || 'blue'));
   });
 }
 function hideColorPopup() { colorPopup.classList.remove('active'); colorTargetId = null; }
@@ -2507,48 +2491,6 @@ function download(filename, text, mime) {
   URL.revokeObjectURL(a.href);
 }
 
-// ── EXPORT MARKDOWN ───────────────────────────────────────────────────
-document.getElementById('btn-export-md').addEventListener('pointerdown', () => {
-  const md = exportMarkdown();
-  download('brainstorm.md', md, 'text/markdown');
-  showToast('已匯出 Markdown');
-});
-
-function exportMarkdown() {
-  // Build adjacency: find roots (no incoming connections)
-  const hasIncoming = new Set(state.connections.map(c => c.to));
-  const roots = state.nodes.filter(n => !hasIncoming.has(n.id));
-  if (!roots.length && state.nodes.length) roots.push(...state.nodes.slice(0,1));
-
-  const visited = new Set();
-  const lines = ['# Brainstorm\n'];
-
-  function renderNode(nodeId, depth) {
-    if (visited.has(nodeId)) return;
-    visited.add(nodeId);
-    const n = state.nodes.find(n => n.id === nodeId);
-    if (!n) return;
-    const prefix = depth === 0 ? '## ' : '  '.repeat(depth - 1) + '- ';
-    lines.push(prefix + (n.text || '(empty)'));
-    const children = state.connections.filter(c => c.from === nodeId).map(c => c.to);
-    children.forEach(cid => renderNode(cid, depth + 1));
-  }
-
-  roots.forEach(n => renderNode(n.id, 0));
-
-  // Orphan nodes
-  state.nodes.forEach(n => {
-    if (!visited.has(n.id)) lines.push('## ' + (n.text || '(empty)'));
-  });
-
-  if (state.stickies.length) {
-    lines.push('\n---\n');
-    lines.push(`> ${state.stickies.length} 張手寫便利貼（圖片內容請見原始檔案）`);
-  }
-
-  return lines.join('\n');
-}
-
 // ── IMPORT ────────────────────────────────────────────────────────────
 document.getElementById('btn-import').addEventListener('pointerdown', () => {
   document.getElementById('import-input').click();
@@ -2559,12 +2501,7 @@ document.getElementById('import-input').addEventListener('change', e => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    const text = ev.target.result;
-    if (file.name.endsWith('.json')) {
-      importJSON(text);
-    } else {
-      importMarkdown(text);
-    }
+    importJSON(ev.target.result);
     e.target.value = '';
   };
   reader.readAsText(file);
@@ -2583,52 +2520,6 @@ function importJSON(text) {
   } catch {
     showToast('JSON 格式錯誤');
   }
-}
-
-function importMarkdown(text) {
-  state.nodes = []; state.connections = []; state.stickies = [];
-  canvasEl.querySelectorAll('.node,.sticky').forEach(el => el.remove());
-  svgLayer.querySelectorAll('.conn-line').forEach(el => el.remove());
-
-  const lines = text.split('\n');
-  const stack = []; // {id, depth}
-  let xBase = 100, yBase = 100;
-  let col = 0;
-
-  lines.forEach(line => {
-    const h2 = line.match(/^##\s+(.+)/);
-    const li = line.match(/^(\s*)[-*]\s+(.+)/);
-    if (h2) {
-      const text = h2[1].trim();
-      const node = {id: genId(), x: xBase + col * 260, y: yBase, text, color: 'cyan'};
-      state.nodes.push(node);
-      createNodeDOM(node);
-      stack.length = 0;
-      stack.push({id: node.id, depth: 0});
-      col++;
-      yBase = 100;
-    } else if (li) {
-      const indent = li[1].length;
-      const text = li[2].trim();
-      const depth = Math.floor(indent / 2) + 1;
-      const node = {id: genId(), x: xBase + (col-1) * 260, y: yBase + depth * 100, text, color: 'purple'};
-      state.nodes.push(node);
-      createNodeDOM(node);
-      // find parent
-      while (stack.length && stack[stack.length-1].depth >= depth) stack.pop();
-      if (stack.length) {
-        const conn = {id: genId(), from: stack[stack.length-1].id, to: node.id};
-        state.connections.push(conn);
-        createConnLine(conn);
-      }
-      stack.push({id: node.id, depth});
-      yBase += 20;
-    }
-  });
-
-  fitAll();
-  snapshot();
-  showToast('已匯入 Markdown');
 }
 
 // ── MINIMAP ───────────────────────────────────────────────────────────
