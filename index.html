@@ -407,6 +407,36 @@
     cursor: text;
   }
   .sticky-title::placeholder { color: rgba(160,120,0,0.3); }
+  .sticky-export-btn {
+    position: absolute;
+    left: -10px;
+    bottom: -10px;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text-dimmer);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    z-index: 5;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s;
+  }
+  .sticky-export-btn:hover {
+    background: rgba(0,119,204,0.08);
+    border-color: rgba(0,119,204,0.4);
+    color: var(--accent);
+  }
+  .sticky-export-btn svg {
+    width: 10px;
+    height: 10px;
+    pointer-events: none;
+  }
   .sticky-del-float {
     position: absolute;
     right: -10px; bottom: -10px;
@@ -424,6 +454,8 @@
     -webkit-tap-highlight-color: transparent;
   }
   .sticky:hover .sticky-del-float,
+  .sticky:hover .sticky-export-btn,
+  .sticky.selected .sticky-export-btn,
   .sticky.selected .sticky-del-float { opacity: 1; }
   .sticky-del-float:hover { background: rgba(255,107,107,0.08); border-color: rgba(255,107,107,0.4); color: var(--accent3); }
   .sticky-del-float svg { width: 10px; height: 10px; pointer-events: none; }
@@ -939,6 +971,10 @@
     <button class="tb-btn" id="btn-save" title="存檔至本機">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       <span class="label">存檔</span>
+    </button>
+    <button class="tb-btn" id="btn-export-png" title="匯出透明 PNG（節點與連線）">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="label">存圖</span>
     </button>
     <button class="tb-btn" id="btn-import" title="開啟 JSON">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
@@ -1852,6 +1888,9 @@ function createStickyDOM(s) {
       <div class="sticky-drag-handle" title="拖曳移動"><svg viewBox="0 0 12 12" fill="currentColor" width="12" height="12"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="10" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="10" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/><circle cx="10" cy="10" r="1.1"/></svg></div>
     </div>
     <canvas width="${stickyCanvasPxWidth}" height="${MEMO_PX_H}"></canvas>
+    <button class="sticky-export-btn" title="匯出透明 PNG">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
     <button class="sticky-del-float" title="刪除便利貼">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
@@ -1870,6 +1909,11 @@ function createStickyDOM(s) {
     img.onload = () => ctx2.drawImage(img, 0, 0, cvs.width, cvs.height);
     img.src = s.dataURL;
   }
+
+  el.querySelector('.sticky-export-btn').addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    exportStickyTransparentPng(s, cvs);
+  });
 
   // Delete
   el.querySelector('.sticky-del-float').addEventListener('pointerdown', e => {
@@ -1913,6 +1957,55 @@ function attachDragEvents(el, item, handleEl) {
     el.removeEventListener('pointerup', onUp);
     if (dragging) { dragging = false; snapshot(); }
   }
+}
+
+function exportStickyTransparentPng(sticky, sourceCanvas) {
+  if (!sourceCanvas) {
+    showToast('匯出失敗');
+    return;
+  }
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+  if (!w || !h) {
+    showToast('匯出失敗');
+    return;
+  }
+
+  const off = document.createElement('canvas');
+  off.width = w;
+  off.height = h;
+  const ctx = off.getContext('2d', { willReadFrequently: true });
+  if (!ctx) {
+    showToast('匯出失敗');
+    return;
+  }
+
+  ctx.drawImage(sourceCanvas, 0, 0);
+  const image = ctx.getImageData(0, 0, w, h);
+  const d = image.data;
+
+  // Remove sticky-paper yellow background (#fffbe6) with tolerance.
+  const bgR = 255, bgG = 251, bgB = 230;
+  const tol = 18;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+    if (!a) continue;
+    if (Math.abs(r - bgR) <= tol && Math.abs(g - bgG) <= tol && Math.abs(b - bgB) <= tol) {
+      d[i + 3] = 0;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+
+  const title = (sticky?.title || '').trim();
+  const safe = (title || `sticky-${sticky?.id || Date.now()}`).replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60);
+  off.toBlob(blob => {
+    if (!blob) {
+      showToast('匯出失敗');
+      return;
+    }
+    downloadBlob(`${safe}.png`, blob);
+    showToast('便利貼已匯出 PNG');
+  }, 'image/png');
 }
 
 // ── HANDWRITING OVERLAY ───────────────────────────────────────────────
@@ -2590,12 +2683,240 @@ document.getElementById('btn-save').addEventListener('pointerdown', () => {
   showToast('已存檔');
 });
 
+document.getElementById('btn-export-png').addEventListener('pointerdown', () => {
+  exportTransparentNodeImage();
+});
+
 function download(filename, text, mime) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], {type: mime}));
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+function downloadBlob(filename, blob) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportTransparentNodeImage() {
+  const nodeEls = Array.from(document.querySelectorAll('.node'));
+  if (!nodeEls.length) {
+    showToast('沒有可匯出的節點');
+    return;
+  }
+
+  const nodes = nodeEls.map(el => {
+    const id = el.dataset.id;
+    const n = state.nodes.find(x => x.id === id);
+    if (!n) return null;
+    return {
+      id,
+      x: n.x,
+      y: n.y,
+      w: el.offsetWidth || 180,
+      h: el.offsetHeight || 80,
+      color: el.dataset.color || n.color || 'white',
+      text: n.text || ''
+    };
+  }).filter(Boolean);
+
+  if (!nodes.length) {
+    showToast('沒有可匯出的節點');
+    return;
+  }
+
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+  function portPos(box, port) {
+    switch (port) {
+      case 'top': return { x: box.x + box.w / 2, y: box.y };
+      case 'bottom': return { x: box.x + box.w / 2, y: box.y + box.h };
+      case 'left': return { x: box.x, y: box.y + box.h / 2 };
+      case 'right': return { x: box.x + box.w, y: box.y + box.h / 2 };
+      default: return { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    }
+  }
+
+  function bezierControls(x1, y1, fromPort, x2, y2, toPort) {
+    const dist = Math.max(50, Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) * 0.45);
+    let c1x = x1, c1y = y1, c2x = x2, c2y = y2;
+    switch (fromPort) {
+      case 'top': c1y -= dist; break;
+      case 'bottom': c1y += dist; break;
+      case 'left': c1x -= dist; break;
+      case 'right': c1x += dist; break;
+      default: c1x += dist;
+    }
+    switch (toPort) {
+      case 'top': c2y -= dist; break;
+      case 'bottom': c2y += dist; break;
+      case 'left': c2x -= dist; break;
+      case 'right': c2x += dist; break;
+      default: c2x -= dist;
+    }
+    return { c1x, c1y, c2x, c2y };
+  }
+
+  const edges = [];
+  state.connections.forEach(c => {
+    const from = nodeMap.get(c.from);
+    const to = nodeMap.get(c.to);
+    if (!from || !to) return;
+    const fromPort = c.fromPort || 'right';
+    const toPort = c.toPort || 'left';
+    const fp = portPos(from, fromPort);
+    const tp = portPos(to, toPort);
+    const ctrl = bezierControls(fp.x, fp.y, fromPort, tp.x, tp.y, toPort);
+    edges.push({
+      x1: fp.x,
+      y1: fp.y,
+      x2: tp.x,
+      y2: tp.y,
+      fromPort,
+      toPort,
+      ...ctrl
+    });
+  });
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    minX = Math.min(minX, n.x);
+    minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + n.w);
+    maxY = Math.max(maxY, n.y + n.h);
+  });
+  edges.forEach(e => {
+    minX = Math.min(minX, e.x1, e.c1x, e.c2x, e.x2);
+    minY = Math.min(minY, e.y1, e.c1y, e.c2y, e.y2);
+    maxX = Math.max(maxX, e.x2, e.c1x, e.c2x);
+    maxY = Math.max(maxY, e.y2, e.c1y, e.c2y);
+  });
+
+  const pad = 28;
+  const width = Math.max(1, Math.ceil(maxX - minX + pad * 2));
+  const height = Math.max(1, Math.ceil(maxY - minY + pad * 2));
+  const scale = 2;
+
+  const off = document.createElement('canvas');
+  off.width = width * scale;
+  off.height = height * scale;
+  const ctx = off.getContext('2d');
+  if (!ctx) {
+    showToast('匯出失敗：無法建立畫布');
+    return;
+  }
+
+  ctx.scale(scale, scale);
+  ctx.translate(-minX + pad, -minY + pad);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  function drawRoundedRect(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+
+  function drawArrowHead(tipX, tipY, fromX, fromY) {
+    const angle = Math.atan2(tipY - fromY, tipX - fromX);
+    const len = 8;
+    const spread = 0.55;
+    const x1 = tipX - Math.cos(angle - spread) * len;
+    const y1 = tipY - Math.sin(angle - spread) * len;
+    const x2 = tipX - Math.cos(angle + spread) * len;
+    const y2 = tipY - Math.sin(angle + spread) * len;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Draw connections first
+  ctx.strokeStyle = '#9aa0b4';
+  ctx.fillStyle = '#9aa0b4';
+  ctx.lineWidth = 1.8;
+  edges.forEach(e => {
+    ctx.beginPath();
+    ctx.moveTo(e.x1, e.y1);
+    ctx.bezierCurveTo(e.c1x, e.c1y, e.c2x, e.c2y, e.x2, e.y2);
+    ctx.stroke();
+    drawArrowHead(e.x2, e.y2, e.c2x, e.c2y);
+  });
+
+  const fillMap = {
+    white: '#ffffff',
+    blue: '#dbeafe',
+    purple: '#ede9fe',
+    red: '#fee2e2',
+    green: '#dcfce7',
+    orange: '#ffedd5'
+  };
+
+  // Draw nodes
+  nodes.forEach(n => {
+    ctx.fillStyle = fillMap[n.color] || '#ffffff';
+    ctx.strokeStyle = 'rgba(26,26,46,0.16)';
+    ctx.lineWidth = 1;
+    drawRoundedRect(n.x, n.y, n.w, n.h, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // Center text in node body
+    const content = (n.text || '').trim();
+    if (!content) return;
+    const maxW = Math.max(20, n.w - 24);
+    const lines = [];
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = '13px "DM Mono", monospace';
+    content.split('\n').forEach(paragraph => {
+      const words = paragraph.split(/\s+/).filter(Boolean);
+      if (!words.length) {
+        lines.push('');
+        return;
+      }
+      let line = words[0];
+      for (let i = 1; i < words.length; i++) {
+        const test = line + ' ' + words[i];
+        if (ctx.measureText(test).width <= maxW) line = test;
+        else {
+          lines.push(line);
+          line = words[i];
+        }
+      }
+      lines.push(line);
+    });
+
+    const lineH = 18;
+    const totalH = lines.length * lineH;
+    let ty = n.y + n.h / 2 - totalH / 2 + lineH / 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    lines.forEach(line => {
+      ctx.fillText(line, n.x + n.w / 2, ty, maxW);
+      ty += lineH;
+    });
+  });
+
+  off.toBlob(blob => {
+    if (!blob) {
+      showToast('匯出失敗');
+      return;
+    }
+    downloadBlob('brainstorm-nodes.png', blob);
+    showToast('已匯出透明 PNG');
+  }, 'image/png');
 }
 
 // ── IMPORT ────────────────────────────────────────────────────────────
