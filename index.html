@@ -808,56 +808,6 @@
   }
   .collab-input:focus { border-color: var(--accent); }
   .collab-input::placeholder { color: var(--text-dimmer); letter-spacing: 0.05em; }
-  .collab-toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0 10px;
-    height: 34px;
-    background: var(--surface);
-    margin-bottom: 0;
-    flex-shrink: 0;
-  }
-  .collab-toggle-label {
-    font-size: 11px;
-    color: var(--text-dim);
-    margin-right: 8px;
-  }
-  .collab-switch {
-    position: relative;
-    width: 40px;
-    height: 22px;
-    display: inline-block;
-    flex-shrink: 0;
-  }
-  .collab-switch input { opacity: 0; width: 0; height: 0; }
-  .collab-slider {
-    position: absolute;
-    inset: 0;
-    background: var(--border);
-    border-radius: 999px;
-    transition: background 0.15s;
-    cursor: pointer;
-  }
-  .collab-slider::before {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    left: 3px;
-    top: 3px;
-    border-radius: 50%;
-    background: #fff;
-    transition: transform 0.15s;
-  }
-  .collab-switch input:checked + .collab-slider {
-    background: var(--accent);
-  }
-  .collab-switch input:checked + .collab-slider::before {
-    transform: translateX(18px);
-  }
   .collab-btn {
     height: 34px;
     padding: 0 14px;
@@ -1110,13 +1060,6 @@
   <div class="collab-body" id="collab-idle">
     <div class="collab-row">
       <button class="collab-btn primary" id="collab-create" style="flex:1;">建立房間</button>
-      <div class="collab-toggle-row collab-hidden" id="collab-force-ws-wrap">
-        <div class="collab-toggle-label">WebSocket</div>
-        <label class="collab-switch">
-          <input type="checkbox" id="collab-force-ws-toggle">
-          <span class="collab-slider"></span>
-        </label>
-      </div>
     </div>
     <div class="collab-row">
       <input class="collab-input" id="collab-join-code" placeholder="輸入房號" maxlength="6" inputmode="numeric">
@@ -2777,9 +2720,6 @@ const collabStatusDot = document.getElementById('collab-status-dot');
 const collabHostTransport = document.getElementById('collab-host-transport');
 const collabJoinedTransport = document.getElementById('collab-joined-transport');
 const collabJoinedPeerCount = document.getElementById('collab-joined-peer-count');
-const collabForceWsToggle = document.getElementById('collab-force-ws-toggle');
-const collabForceWsWrap = document.getElementById('collab-force-ws-wrap');
-
 const COLLAB_TRANSPORT = {
   AUTO: 'auto',
   PEERJS: 'peerjs',
@@ -2952,13 +2892,6 @@ function collabProbeWebSocketAvailability(timeoutMs = 2500) {
       if (!done) finish(false);
     };
   });
-}
-
-function collabUpdateForceWsVisibility() {
-  collabForceWsWrap.classList.toggle('collab-hidden', !collabWsAvailable);
-  if (!collabWsAvailable) {
-    collabForceWsToggle.checked = false;
-  }
 }
 
 function collabBuildWsUrl(baseUrl, room, role) {
@@ -3196,11 +3129,7 @@ function collabConnectWebSocket(code, role, onReady, onFail) {
 }
 
 function collabTransportOrder() {
-  if (collabWsAvailable && collabForceWsToggle.checked) {
-    return [COLLAB_TRANSPORT.WEBSOCKET];
-  }
-  // Default strategy: try PeerJS first, then fallback to same-host WebSocket.
-  return [COLLAB_TRANSPORT.PEERJS, COLLAB_TRANSPORT.WEBSOCKET];
+  return collabWsAvailable ? [COLLAB_TRANSPORT.WEBSOCKET] : [COLLAB_TRANSPORT.PEERJS];
 }
 
 function collabStart(mode, inputCode = '') {
@@ -3210,8 +3139,6 @@ function collabStart(mode, inputCode = '') {
     showToast('請輸入 6 位數房號');
     return;
   }
-
-  localStorage.setItem('bst_collab_force_websocket', (collabWsAvailable && collabForceWsToggle.checked) ? '1' : '0');
 
   const order = collabTransportOrder();
   let idx = 0;
@@ -3288,10 +3215,6 @@ document.addEventListener('pointerdown', e => {
   }
 });
 
-collabForceWsToggle.addEventListener('change', () => {
-  localStorage.setItem('bst_collab_force_websocket', (collabWsAvailable && collabForceWsToggle.checked) ? '1' : '0');
-});
-
 document.getElementById('collab-create').addEventListener('pointerdown', () => {
   collabStart('create');
 });
@@ -3325,16 +3248,10 @@ document.getElementById('collab-leave').addEventListener('pointerdown', () => {
 });
 
 function init() {
-  collabForceWsToggle.checked = localStorage.getItem('bst_collab_force_websocket') === '1';
-  collabUpdateForceWsVisibility();
   collabSetActiveTransportLabel();
 
   collabProbeWebSocketAvailability().then(ok => {
     collabWsAvailable = ok;
-    if (!ok) {
-      localStorage.setItem('bst_collab_force_websocket', '0');
-    }
-    collabUpdateForceWsVisibility();
   });
 
   // Load from localStorage

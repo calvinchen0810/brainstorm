@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 app = FastAPI(title="Brainstorm Collaboration Server")
 ROOT_DIR = Path(__file__).resolve().parent
@@ -44,12 +44,12 @@ rooms_lock = asyncio.Lock()
 
 
 @app.get("/health")
-async def health() -> dict[str, Any]:
-    return {
-        "ok": True,
-        "rooms": len(rooms),
-        "clients": sum(len(room.clients) for room in rooms.values()),
-    }
+def health():
+    return Response(content="OK", status_code=200)
+
+@app.head("/health")
+def health_check_head():
+    return Response(status_code=200)
 
 
 @app.get("/")
