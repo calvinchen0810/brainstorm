@@ -790,6 +790,7 @@
   .collab-body { padding: 12px 14px; }
   .collab-body p { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.5; }
   .collab-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .collab-hidden { display: none !important; }
   .collab-input {
     flex: 1;
     height: 34px;
@@ -807,6 +808,56 @@
   }
   .collab-input:focus { border-color: var(--accent); }
   .collab-input::placeholder { color: var(--text-dimmer); letter-spacing: 0.05em; }
+  .collab-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0 10px;
+    height: 34px;
+    background: var(--surface);
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+  .collab-toggle-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-right: 8px;
+  }
+  .collab-switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .collab-switch input { opacity: 0; width: 0; height: 0; }
+  .collab-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 999px;
+    transition: background 0.15s;
+    cursor: pointer;
+  }
+  .collab-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
+  }
+  .collab-switch input:checked + .collab-slider {
+    background: var(--accent);
+  }
+  .collab-switch input:checked + .collab-slider::before {
+    transform: translateX(18px);
+  }
   .collab-btn {
     height: 34px;
     padding: 0 14px;
@@ -844,6 +895,16 @@
     margin-top: 6px;
   }
   .collab-peers span { color: var(--accent); font-weight: 600; }
+  .collab-transport {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: -4px;
+    margin-bottom: 10px;
+  }
+  .collab-transport span {
+    color: var(--accent2);
+    font-weight: 600;
+  }
 
 </style>
 </head>
@@ -1047,9 +1108,15 @@
     多人協作
   </div>
   <div class="collab-body" id="collab-idle">
-    <p>建立房間讓其他人加入，或輸入房間號碼加入他人的畫布。</p>
     <div class="collab-row">
       <button class="collab-btn primary" id="collab-create" style="flex:1;">建立房間</button>
+      <div class="collab-toggle-row collab-hidden" id="collab-force-ws-wrap">
+        <div class="collab-toggle-label">WebSocket</div>
+        <label class="collab-switch">
+          <input type="checkbox" id="collab-force-ws-toggle">
+          <span class="collab-slider"></span>
+        </label>
+      </div>
     </div>
     <div class="collab-row">
       <input class="collab-input" id="collab-join-code" placeholder="輸入房號" maxlength="6" inputmode="numeric">
@@ -1059,6 +1126,7 @@
   <div class="collab-body" id="collab-hosting" style="display:none;">
     <p>分享此房間號碼給協作者：</p>
     <div class="collab-room-code" id="collab-room-display"></div>
+    <div class="collab-transport">目前傳輸：<span id="collab-host-transport">-</span></div>
     <div class="collab-peers" id="collab-peer-count">已連線：<span>0</span> 人</div>
     <div class="collab-row" style="margin-top:10px;">
       <button class="collab-btn" id="collab-copy" style="flex:1;">複製房號</button>
@@ -1068,6 +1136,7 @@
   <div class="collab-body" id="collab-joined" style="display:none;">
     <p>已連線至房間：</p>
     <div class="collab-room-code" id="collab-joined-display"></div>
+    <div class="collab-transport">目前傳輸：<span id="collab-joined-transport">-</span></div>
     <div class="collab-peers" id="collab-joined-peer-count">協作中</div>
     <div class="collab-row" style="margin-top:10px;">
       <button class="collab-btn danger" id="collab-leave" style="flex:1;">離開房間</button>
@@ -2699,19 +2768,35 @@ function showToast(msg, duration = 2000) {
 
 // ── INIT ──────────────────────────────────────────────────────────────
 
-// ── COLLABORATION (WebRTC via PeerJS) ─────────────────────────────────
+// ── COLLABORATION (PeerJS + FastAPI WebSocket) ───────────────────────
 const collabPanel = document.getElementById('collab-panel');
 const collabIdle = document.getElementById('collab-idle');
 const collabHosting = document.getElementById('collab-hosting');
 const collabJoined = document.getElementById('collab-joined');
 const collabStatusDot = document.getElementById('collab-status-dot');
+const collabHostTransport = document.getElementById('collab-host-transport');
+const collabJoinedTransport = document.getElementById('collab-joined-transport');
+const collabJoinedPeerCount = document.getElementById('collab-joined-peer-count');
+const collabForceWsToggle = document.getElementById('collab-force-ws-toggle');
+const collabForceWsWrap = document.getElementById('collab-force-ws-wrap');
 
-let collabPeer = null;       // PeerJS instance
-let collabRole = null;       // 'host' | 'guest' | null
+const COLLAB_TRANSPORT = {
+  AUTO: 'auto',
+  PEERJS: 'peerjs',
+  WEBSOCKET: 'websocket'
+};
+
+let collabPeer = null;        // PeerJS instance
+let collabSocket = null;      // WebSocket instance
+let collabRole = null;        // 'host' | 'guest' | null
 let collabRoomCode = null;
-let collabConns = [];        // host: array of DataConnection to guests
-let collabHostConn = null;   // guest: DataConnection to host
-let collabSyncLock = false;  // prevent echo loops
+let collabConns = [];         // host over PeerJS
+let collabHostConn = null;    // guest over PeerJS
+let collabSyncLock = false;   // prevent echo loops
+let collabActiveTransport = null; // 'peerjs' | 'websocket' | null
+let collabWsPeerCount = 0;
+let collabWsAvailable = false;
+const collabClientId = 'c-' + Math.random().toString(36).slice(2, 10);
 
 function generateRoomCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -2721,10 +2806,27 @@ function collabPeerId(code) {
   return 'bst-room-' + code;
 }
 
+function collabTransportLabel(mode) {
+  if (mode === COLLAB_TRANSPORT.PEERJS) return 'PeerJS / WebRTC';
+  if (mode === COLLAB_TRANSPORT.WEBSOCKET) return 'FastAPI WebSocket';
+  return '未連線';
+}
+
+function collabSetActiveTransportLabel() {
+  const label = collabTransportLabel(collabActiveTransport);
+  collabHostTransport.textContent = label;
+  collabJoinedTransport.textContent = label;
+}
+
 function collabUpdatePeerCount() {
-  const count = collabConns.filter(c => c.open).length;
   const el = document.getElementById('collab-peer-count');
-  if (el) el.innerHTML = '已連線：<span>' + count + '</span> 人';
+  if (!el) return;
+  if (collabActiveTransport === COLLAB_TRANSPORT.WEBSOCKET) {
+    el.innerHTML = '已連線：<span>' + Math.max(0, collabWsPeerCount) + '</span> 人';
+    return;
+  }
+  const count = collabConns.filter(c => c.open).length;
+  el.innerHTML = '已連線：<span>' + count + '</span> 人';
 }
 
 function collabShowPanel(view) {
@@ -2747,6 +2849,7 @@ function collabApplyState(data) {
   collabSyncLock = true;
   try {
     const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    if (!parsed || typeof parsed !== 'object') return;
     state.nodes = parsed.nodes || [];
     state.stickies = parsed.stickies || [];
     state.connections = parsed.connections || [];
@@ -2760,22 +2863,181 @@ function collabApplyState(data) {
   collabSyncLock = false;
 }
 
-// Broadcast state to all peers (host broadcasts to guests, guest sends to host)
-function collabBroadcast() {
-  if (collabSyncLock) return;
-  const payload = collabGetState();
-  if (collabRole === 'host') {
-    collabConns.forEach(c => { if (c.open) c.send(payload); });
-  } else if (collabRole === 'guest' && collabHostConn?.open) {
-    collabHostConn.send(payload);
+function collabWsSend(type, extra = {}) {
+  if (!collabSocket || collabSocket.readyState !== WebSocket.OPEN) return;
+  collabSocket.send(JSON.stringify({
+    type,
+    room: collabRoomCode,
+    role: collabRole,
+    clientId: collabClientId,
+    ...extra
+  }));
+}
+
+function collabParseWsMessage(rawData) {
+  let msg = rawData;
+  if (typeof rawData === 'string') {
+    try {
+      msg = JSON.parse(rawData);
+    } catch {
+      return null;
+    }
+  }
+  return msg;
+}
+
+function collabHandleWsMessage(rawData) {
+  const msg = collabParseWsMessage(rawData);
+  if (!msg || typeof msg !== 'object') return;
+  if (msg.senderId && msg.senderId === collabClientId) return;
+
+  if (msg.type === 'peer_count' || msg.type === 'presence') {
+    const count = Number(msg.count ?? msg.peerCount ?? 0);
+    if (!Number.isNaN(count)) {
+      collabWsPeerCount = count;
+      collabUpdatePeerCount();
+    }
+    return;
+  }
+
+  if (msg.type === 'state_request' && collabRole === 'host') {
+    collabWsSend('state_sync', { state: JSON.parse(collabGetState()) });
+    return;
+  }
+
+  const maybeState = msg.state || msg.payload || msg.data;
+  if (maybeState && typeof maybeState === 'object' && maybeState.nodes && maybeState.connections) {
+    collabApplyState(maybeState);
+    return;
+  }
+
+  if (msg.nodes && msg.connections) {
+    collabApplyState(msg);
   }
 }
 
-// ── HOST: Create room ──
-function collabCreateRoom() {
-  collabRoomCode = generateRoomCode();
-  const peerId = collabPeerId(collabRoomCode);
+function collabWebSocketBaseUrl() {
+  return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/collab';
+}
 
+function collabProbeWebSocketAvailability(timeoutMs = 2500) {
+  return new Promise(resolve => {
+    let done = false;
+    const probeWsUrl = collabBuildWsUrl(collabWebSocketBaseUrl(), '000000', 'guest');
+    let ws;
+
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        ws?.close();
+      } catch {}
+      resolve(ok);
+    };
+
+    const timer = setTimeout(() => finish(false), timeoutMs);
+
+    try {
+      ws = new WebSocket(probeWsUrl);
+    } catch {
+      finish(false);
+      return;
+    }
+
+    ws.onopen = () => finish(true);
+    ws.onerror = () => finish(false);
+    ws.onclose = () => {
+      // Keep existing result if already resolved by onopen/onerror.
+      if (!done) finish(false);
+    };
+  });
+}
+
+function collabUpdateForceWsVisibility() {
+  collabForceWsWrap.classList.toggle('collab-hidden', !collabWsAvailable);
+  if (!collabWsAvailable) {
+    collabForceWsToggle.checked = false;
+  }
+}
+
+function collabBuildWsUrl(baseUrl, room, role) {
+  let url;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error('WebSocket 位址格式錯誤');
+  }
+  if (!/^wss?:$/.test(url.protocol)) {
+    throw new Error('WebSocket 位址必須是 ws:// 或 wss://');
+  }
+  url.searchParams.set('room', room);
+  url.searchParams.set('role', role);
+  url.searchParams.set('clientId', collabClientId);
+  return url.toString();
+}
+
+function collabHandleConnected(transport, role, roomCode) {
+  collabActiveTransport = transport;
+  collabRole = role;
+  collabRoomCode = roomCode;
+  collabSetActiveTransportLabel();
+  collabUpdatePeerCount();
+
+  if (role === 'host') {
+    document.getElementById('collab-room-display').textContent = roomCode;
+    collabShowPanel('hosting');
+  } else {
+    document.getElementById('collab-joined-display').textContent = roomCode;
+    collabJoinedPeerCount.textContent = transport === COLLAB_TRANSPORT.WEBSOCKET
+      ? 'WebSocket 協作中'
+      : 'PeerJS 協作中';
+    collabShowPanel('joined');
+  }
+
+  document.getElementById('btn-collab').classList.add('active');
+  showToast('已使用 ' + collabTransportLabel(transport) + ' 連線', 2200);
+}
+
+function collabResetRuntime() {
+  if (collabSocket) {
+    try {
+      collabSocket.onopen = null;
+      collabSocket.onmessage = null;
+      collabSocket.onerror = null;
+      collabSocket.onclose = null;
+      if (collabSocket.readyState === WebSocket.OPEN || collabSocket.readyState === WebSocket.CONNECTING) {
+        collabSocket.close();
+      }
+    } catch {}
+    collabSocket = null;
+  }
+
+  if (collabPeer) {
+    try {
+      collabPeer.destroy();
+    } catch {}
+    collabPeer = null;
+  }
+
+  collabConns = [];
+  collabHostConn = null;
+  collabWsPeerCount = 0;
+}
+
+function collabDisconnect(keepPanel = false) {
+  collabResetRuntime();
+  collabRole = null;
+  collabRoomCode = null;
+  collabActiveTransport = null;
+  collabSyncLock = false;
+  collabSetActiveTransportLabel();
+  if (!keepPanel) collabShowPanel('idle');
+  document.getElementById('btn-collab').classList.remove('active');
+}
+
+function collabCreateRoomPeer(code, onReady, onFail) {
+  const peerId = collabPeerId(code);
   collabPeer = new Peer(peerId, {
     config: { iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -2783,24 +3045,27 @@ function collabCreateRoom() {
     ]}
   });
 
+  let resolved = false;
+  const fail = (err) => {
+    if (resolved) return;
+    resolved = true;
+    onFail(err);
+  };
+
   collabPeer.on('open', () => {
-    collabRole = 'host';
-    document.getElementById('collab-room-display').textContent = collabRoomCode;
-    collabShowPanel('hosting');
-    showToast('房間已建立：' + collabRoomCode, 3000);
-    document.getElementById('btn-collab').classList.add('active');
+    if (resolved) return;
+    resolved = true;
+    onReady();
   });
 
   collabPeer.on('connection', conn => {
     collabConns.push(conn);
     conn.on('open', () => {
-      // Send current state to new peer
       conn.send(collabGetState());
       collabUpdatePeerCount();
       showToast('有人加入了房間');
     });
     conn.on('data', data => {
-      // Guest sent an update → apply & relay to others
       collabApplyState(data);
       const payload = collabGetState();
       collabConns.forEach(c => {
@@ -2819,22 +3084,11 @@ function collabCreateRoom() {
   });
 
   collabPeer.on('error', err => {
-    if (err.type === 'unavailable-id') {
-      showToast('房號已被使用，請重試');
-      collabDisconnect();
-    } else {
-      console.warn('PeerJS error:', err);
-      showToast('連線錯誤：' + err.type);
-    }
+    fail(err || new Error('PeerJS 建立房間失敗'));
   });
 }
 
-// ── GUEST: Join room ──
-function collabJoinRoom(code) {
-  code = code.trim();
-  if (!/^\d{6}$/.test(code)) { showToast('請輸入 6 位數房號'); return; }
-
-  collabRoomCode = code;
+function collabJoinRoomPeer(code, onReady, onFail) {
   collabPeer = new Peer(undefined, {
     config: { iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -2842,16 +3096,21 @@ function collabJoinRoom(code) {
     ]}
   });
 
+  let resolved = false;
+  const fail = (err) => {
+    if (resolved) return;
+    resolved = true;
+    onFail(err);
+  };
+
   collabPeer.on('open', () => {
     const conn = collabPeer.connect(collabPeerId(code), { reliable: true });
     collabHostConn = conn;
 
     conn.on('open', () => {
-      collabRole = 'guest';
-      document.getElementById('collab-joined-display').textContent = code;
-      collabShowPanel('joined');
-      showToast('已加入房間：' + code, 3000);
-      document.getElementById('btn-collab').classList.add('active');
+      if (resolved) return;
+      resolved = true;
+      onReady();
     });
 
     conn.on('data', data => {
@@ -2859,38 +3118,163 @@ function collabJoinRoom(code) {
     });
 
     conn.on('close', () => {
-      showToast('與房間的連線已中斷');
-      collabDisconnect();
+      if (collabRole) {
+        showToast('與房間的連線已中斷');
+        collabDisconnect();
+      }
     });
 
     conn.on('error', err => {
-      showToast('連線錯誤：' + err.type);
-      collabDisconnect();
+      if (!resolved) {
+        fail(err || new Error('PeerJS 連線失敗'));
+      } else if (collabRole) {
+        showToast('連線錯誤：' + (err?.type || 'peerjs'));
+        collabDisconnect();
+      }
     });
   });
 
   collabPeer.on('error', err => {
-    if (err.type === 'peer-unavailable') {
-      showToast('找不到此房間，請確認房號');
-    } else {
-      showToast('連線錯誤：' + err.type);
-    }
-    collabDisconnect();
+    fail(err || new Error('PeerJS 加入房間失敗'));
   });
 }
 
-function collabDisconnect() {
-  if (collabPeer) {
-    collabPeer.destroy();
-    collabPeer = null;
+function collabConnectWebSocket(code, role, onReady, onFail) {
+  let wsUrl = '';
+  try {
+    wsUrl = collabBuildWsUrl(collabWebSocketBaseUrl(), code, role);
+  } catch (err) {
+    onFail(err);
+    return;
   }
-  collabConns = [];
-  collabHostConn = null;
-  collabRole = null;
-  collabRoomCode = null;
-  collabSyncLock = false;
-  collabShowPanel('idle');
-  document.getElementById('btn-collab').classList.remove('active');
+
+  try {
+    collabSocket = new WebSocket(wsUrl);
+  } catch (err) {
+    onFail(err);
+    return;
+  }
+
+  let resolved = false;
+  const timeoutId = setTimeout(() => {
+    if (resolved) return;
+    resolved = true;
+    onFail(new Error('WebSocket 連線逾時'));
+  }, 8000);
+
+  collabSocket.onopen = () => {
+    if (resolved) return;
+    resolved = true;
+    clearTimeout(timeoutId);
+    collabWsSend('join');
+    if (role === 'host') {
+      collabWsSend('state_sync', { state: JSON.parse(collabGetState()) });
+    } else {
+      collabWsSend('state_request');
+    }
+    onReady();
+  };
+
+  collabSocket.onmessage = ev => {
+    collabHandleWsMessage(ev.data);
+  };
+
+  collabSocket.onerror = () => {
+    if (resolved) return;
+    resolved = true;
+    clearTimeout(timeoutId);
+    onFail(new Error('WebSocket 連線失敗'));
+  };
+
+  collabSocket.onclose = () => {
+    if (!resolved) return;
+    if (collabRole) {
+      showToast('WebSocket 連線已中斷');
+      collabDisconnect();
+    }
+  };
+}
+
+function collabTransportOrder() {
+  if (collabWsAvailable && collabForceWsToggle.checked) {
+    return [COLLAB_TRANSPORT.WEBSOCKET];
+  }
+  // Default strategy: try PeerJS first, then fallback to same-host WebSocket.
+  return [COLLAB_TRANSPORT.PEERJS, COLLAB_TRANSPORT.WEBSOCKET];
+}
+
+function collabStart(mode, inputCode = '') {
+  const role = mode === 'create' ? 'host' : 'guest';
+  const code = mode === 'create' ? generateRoomCode() : inputCode.trim();
+  if (mode === 'join' && !/^\d{6}$/.test(code)) {
+    showToast('請輸入 6 位數房號');
+    return;
+  }
+
+  localStorage.setItem('bst_collab_force_websocket', (collabWsAvailable && collabForceWsToggle.checked) ? '1' : '0');
+
+  const order = collabTransportOrder();
+  let idx = 0;
+
+  collabDisconnect(true);
+
+  const attemptNext = () => {
+    if (idx >= order.length) {
+      collabDisconnect();
+      showToast('無法建立連線，請檢查網路或後端設定');
+      return;
+    }
+
+    const transport = order[idx++];
+    showToast('嘗試使用 ' + collabTransportLabel(transport) + '…', 1200);
+
+    const onReady = () => {
+      collabHandleConnected(transport, role, code);
+      if (role === 'host') {
+        showToast('房間已建立：' + code, 2600);
+      } else {
+        showToast('已加入房間：' + code, 2600);
+      }
+    };
+
+    const onFail = (err) => {
+      console.warn('collab transport failed:', transport, err);
+      collabResetRuntime();
+      if (order.length > 1 && idx < order.length) {
+        showToast('PeerJS 受阻，改用 WebSocket…', 1500);
+      }
+      attemptNext();
+    };
+
+    if (transport === COLLAB_TRANSPORT.PEERJS) {
+      if (mode === 'create') collabCreateRoomPeer(code, onReady, onFail);
+      else collabJoinRoomPeer(code, onReady, onFail);
+      return;
+    }
+
+    collabConnectWebSocket(code, role, onReady, onFail);
+  };
+
+  attemptNext();
+}
+
+// Broadcast state: transport-aware
+function collabBroadcast() {
+  if (collabSyncLock || !collabRole || !collabActiveTransport) return;
+  const payload = collabGetState();
+
+  if (collabActiveTransport === COLLAB_TRANSPORT.PEERJS) {
+    if (collabRole === 'host') {
+      collabConns.forEach(c => { if (c.open) c.send(payload); });
+    } else if (collabRole === 'guest' && collabHostConn?.open) {
+      collabHostConn.send(payload);
+    }
+    return;
+  }
+
+  if (collabActiveTransport === COLLAB_TRANSPORT.WEBSOCKET) {
+    collabWsSend('state_update', { state: JSON.parse(payload), senderId: collabClientId });
+  }
 }
 
 // ── Collab UI events ──
@@ -2904,19 +3288,23 @@ document.addEventListener('pointerdown', e => {
   }
 });
 
+collabForceWsToggle.addEventListener('change', () => {
+  localStorage.setItem('bst_collab_force_websocket', (collabWsAvailable && collabForceWsToggle.checked) ? '1' : '0');
+});
+
 document.getElementById('collab-create').addEventListener('pointerdown', () => {
-  collabCreateRoom();
+  collabStart('create');
 });
 
 document.getElementById('collab-join').addEventListener('pointerdown', () => {
   const code = document.getElementById('collab-join-code').value;
-  collabJoinRoom(code);
+  collabStart('join', code);
 });
 
 document.getElementById('collab-join-code').addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     e.preventDefault();
-    collabJoinRoom(e.target.value);
+    collabStart('join', e.target.value);
   }
 });
 
@@ -2937,6 +3325,18 @@ document.getElementById('collab-leave').addEventListener('pointerdown', () => {
 });
 
 function init() {
+  collabForceWsToggle.checked = localStorage.getItem('bst_collab_force_websocket') === '1';
+  collabUpdateForceWsVisibility();
+  collabSetActiveTransportLabel();
+
+  collabProbeWebSocketAvailability().then(ok => {
+    collabWsAvailable = ok;
+    if (!ok) {
+      localStorage.setItem('bst_collab_force_websocket', '0');
+    }
+    collabUpdateForceWsVisibility();
+  });
+
   // Load from localStorage
   try {
     const saved = localStorage.getItem('bst_state');
