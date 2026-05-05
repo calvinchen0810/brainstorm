@@ -3204,7 +3204,9 @@ function collabHandleWsMessage(rawData) {
 }
 
 function collabWebSocketBaseUrl() {
-  return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/collab';
+  const wsUrl = new URL('ws/collab', window.location.href);
+  wsUrl.protocol = (location.protocol === 'https:' ? 'wss:' : 'ws:');
+  return wsUrl.toString();
 }
 
 function collabProbeWebSocketAvailability(timeoutMs = 2500) {
