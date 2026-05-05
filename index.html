@@ -916,6 +916,98 @@
     font-weight: 600;
   }
 
+  /* ── Cloud save panel ─────────────────────────────────────────────────── */
+  #cloud-panel {
+    position: fixed;
+    top: calc(var(--toolbar-h) + 12px);
+    right: 12px;
+    width: 260px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    z-index: 998;
+    display: none;
+    overflow: hidden;
+    font-family: var(--font-mono);
+  }
+  #cloud-panel.active { display: block; }
+  .cloud-header {
+    padding: 12px 14px 8px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+  .cloud-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .cloud-tab {
+    flex: 1;
+    padding: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-dim);
+    border-bottom: 2px solid transparent;
+  }
+  .cloud-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .cloud-body { padding: 12px 14px; }
+  .cloud-body p { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.5; }
+  .cloud-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .cloud-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 0 10px;
+    height: 34px;
+    outline: none;
+    min-width: 0;
+  }
+  .cloud-input:focus { border-color: var(--accent); }
+  .cloud-input::placeholder { color: var(--text-dimmer); }
+  .cloud-btn {
+    height: 34px;
+    padding: 0 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .cloud-btn:hover { background: var(--surface2); border-color: var(--border-active); }
+  .cloud-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .cloud-btn.primary:hover { opacity: 0.9; }
+  .cloud-code-display {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    text-align: center;
+    font-size: 20px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .cloud-msg { font-size: 11px; color: var(--text-dim); text-align: center; margin-bottom: 8px; }
+  .cloud-msg.error { color: var(--accent3); }
+  .cloud-msg.warn { color: #f0a500; }
+
 </style>
 </head>
 <body>
@@ -987,6 +1079,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
     </button>
     <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-cloud" title="雲端儲存專案" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+      <span class="label">雲端</span>
+    </button>
     <button class="tb-btn" id="btn-collab" title="多人協作">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span class="label">協作</span>
@@ -1154,6 +1250,51 @@
     <div class="collab-row" style="margin-top:10px;">
       <button class="collab-btn danger" id="collab-leave" style="flex:1;">離開房間</button>
     </div>
+  </div>
+</div>
+
+<!-- Cloud save panel -->
+<div id="cloud-panel">
+  <div class="cloud-header">☁ 雲端儲存</div>
+  <div class="cloud-tabs">
+    <button class="cloud-tab active" id="cloud-tab-save">儲存</button>
+    <button class="cloud-tab" id="cloud-tab-load">載入</button>
+  </div>
+  <!-- Save view -->
+  <div class="cloud-body" id="cloud-save-view">
+    <p>設定密碼後儲存目前畫布，取得六碼代碼以供日後載入。</p>
+    <div class="cloud-row">
+      <input class="cloud-input" id="cloud-save-pw" type="password" placeholder="設定密碼">
+    </div>
+    <div id="cloud-save-update-row" class="cloud-row" style="display:none">
+      <input class="cloud-input" id="cloud-save-code-input" placeholder="代碼" maxlength="6" style="text-transform:uppercase;width:90px;flex:none">
+      <button class="cloud-btn" id="cloud-btn-update" style="flex:1">覆寫更新</button>
+    </div>
+    <div class="cloud-row">
+      <button class="cloud-btn primary" id="cloud-btn-save" style="flex:1">儲存新版本</button>
+    </div>
+    <div id="cloud-save-result" style="display:none">
+      <div class="cloud-code-display" id="cloud-code-out"></div>
+      <div class="cloud-msg">請複製代碼以便日後載入</div>
+      <div class="cloud-row">
+        <button class="cloud-btn primary" id="cloud-btn-copy-code" style="flex:1">複製代碼</button>
+      </div>
+    </div>
+    <div class="cloud-msg error" id="cloud-save-err" style="display:none"></div>
+  </div>
+  <!-- Load view -->
+  <div class="cloud-body" id="cloud-load-view" style="display:none">
+    <p>輸入代碼與密碼以載入雲端專案（將覆蓋目前畫布）。</p>
+    <div class="cloud-row">
+      <input class="cloud-input" id="cloud-load-code" placeholder="六碼代碼" maxlength="6" style="text-transform:uppercase">
+    </div>
+    <div class="cloud-row">
+      <input class="cloud-input" id="cloud-load-pw" type="password" placeholder="密碼">
+    </div>
+    <div class="cloud-row">
+      <button class="cloud-btn primary" id="cloud-btn-load" style="flex:1">載入</button>
+    </div>
+    <div class="cloud-msg error" id="cloud-load-err" style="display:none"></div>
   </div>
 </div>
 
@@ -3550,6 +3691,168 @@ function collabBroadcast() {
     collabWsSend('state_update', { state: JSON.parse(payload), senderId: collabClientId });
   }
 }
+
+// ── Cloud save UI ──────────────────────────────────────────────────────────
+(function () {
+  const btnCloud   = document.getElementById('btn-cloud');
+  const cloudPanel = document.getElementById('cloud-panel');
+  const saveView   = document.getElementById('cloud-save-view');
+  const loadView   = document.getElementById('cloud-load-view');
+  const tabSave    = document.getElementById('cloud-tab-save');
+  const tabLoad    = document.getElementById('cloud-tab-load');
+  const savePw     = document.getElementById('cloud-save-pw');
+  const saveErr    = document.getElementById('cloud-save-err');
+  const saveResult = document.getElementById('cloud-save-result');
+  const codeOut    = document.getElementById('cloud-code-out');
+  const updateRow  = document.getElementById('cloud-save-update-row');
+  const codeInput  = document.getElementById('cloud-save-code-input');
+  const btnSave    = document.getElementById('cloud-btn-save');
+  const btnUpdate  = document.getElementById('cloud-btn-update');
+  const btnCopy    = document.getElementById('cloud-btn-copy-code');
+  const loadCode   = document.getElementById('cloud-load-code');
+  const loadPw     = document.getElementById('cloud-load-pw');
+  const loadErr    = document.getElementById('cloud-load-err');
+  const btnLoad    = document.getElementById('cloud-btn-load');
+
+  // Check server capability
+  fetch('/api/storage-info').then(r => r.json()).then(d => {
+    if (d.available) btnCloud.style.display = '';
+  }).catch(() => {});
+
+  function switchTab(tab) {
+    tabSave.classList.toggle('active', tab === 'save');
+    tabLoad.classList.toggle('active', tab === 'load');
+    saveView.style.display = tab === 'save' ? '' : 'none';
+    loadView.style.display = tab === 'load' ? '' : 'none';
+  }
+  tabSave.addEventListener('click', () => switchTab('save'));
+  tabLoad.addEventListener('click', () => switchTab('load'));
+
+  // Restore remembered code
+  function refreshUpdateRow() {
+    const remembered = sessionStorage.getItem('bst_cloud_code');
+    if (remembered) {
+      updateRow.style.display = '';
+      codeInput.value = remembered;
+    } else {
+      updateRow.style.display = 'none';
+    }
+  }
+
+  btnCloud.addEventListener('pointerdown', () => {
+    const isOpen = cloudPanel.classList.toggle('active');
+    if (isOpen) { switchTab('save'); refreshUpdateRow(); saveErr.style.display = 'none'; saveResult.style.display = 'none'; }
+  });
+
+  document.addEventListener('pointerdown', e => {
+    if (!e.target.closest('#cloud-panel') && !e.target.closest('#btn-cloud'))
+      cloudPanel.classList.remove('active');
+  });
+
+  function currentState() {
+    document.querySelectorAll('.sticky').forEach(el => {
+      const id = el.dataset.id;
+      const s = state.stickies.find(s => s.id === id);
+      if (s) s.dataURL = el.querySelector('canvas').toDataURL();
+    });
+    return collabGetState();
+  }
+
+  async function doSave() {
+    const pw = savePw.value.trim();
+    if (!pw) { saveErr.textContent = '請輸入密碼'; saveErr.style.display = ''; return; }
+    saveErr.style.display = 'none';
+    btnSave.disabled = true;
+    try {
+      const r = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password: pw, state: currentState()})
+      });
+      if (!r.ok) throw new Error((await r.json()).detail || r.status);
+      const {code} = await r.json();
+      sessionStorage.setItem('bst_cloud_code', code);
+      codeOut.textContent = code;
+      saveResult.style.display = '';
+      refreshUpdateRow();
+      savePw.value = '';
+    } catch (e) {
+      saveErr.textContent = '儲存失敗：' + e.message;
+      saveErr.style.display = '';
+    } finally {
+      btnSave.disabled = false;
+    }
+  }
+
+  async function doUpdate() {
+    const pw = savePw.value.trim();
+    const code = codeInput.value.trim().toUpperCase();
+    if (!pw) { saveErr.textContent = '請輸入密碼'; saveErr.style.display = ''; return; }
+    if (!code) { saveErr.textContent = '請輸入代碼'; saveErr.style.display = ''; return; }
+    saveErr.style.display = 'none';
+    btnUpdate.disabled = true;
+    try {
+      const r = await fetch(`/api/projects/${code}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password: pw, state: currentState()})
+      });
+      if (!r.ok) throw new Error((await r.json()).detail || r.status);
+      codeOut.textContent = code;
+      saveResult.style.display = '';
+      savePw.value = '';
+      showToast('已覆寫更新');
+    } catch (e) {
+      const msg = e.message;
+      saveErr.textContent = msg === 'Wrong password' ? '密碼錯誤' : '更新失敗：' + msg;
+      saveErr.style.display = '';
+    } finally {
+      btnUpdate.disabled = false;
+    }
+  }
+
+  btnSave.addEventListener('click', doSave);
+  btnUpdate.addEventListener('click', doUpdate);
+  savePw.addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
+
+  btnCopy.addEventListener('click', () => {
+    navigator.clipboard.writeText(codeOut.textContent).then(() => showToast('代碼已複製'));
+  });
+
+  async function doLoad() {
+    const code = loadCode.value.trim().toUpperCase();
+    const pw   = loadPw.value.trim();
+    if (!code) { loadErr.textContent = '請輸入代碼'; loadErr.style.display = ''; return; }
+    if (!pw)   { loadErr.textContent = '請輸入密碼'; loadErr.style.display = ''; return; }
+    loadErr.style.display = 'none';
+    btnLoad.disabled = true;
+    try {
+      const r = await fetch(`/api/projects/${code}/load`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password: pw})
+      });
+      if (!r.ok) {
+        const detail = (await r.json()).detail || r.status;
+        throw new Error(detail === 'Wrong password' ? '密碼錯誤' : detail === 'Project not found' ? '代碼不存在' : detail);
+      }
+      const {state: loaded} = await r.json();
+      collabApplyState(loaded);
+      sessionStorage.setItem('bst_cloud_code', code);
+      cloudPanel.classList.remove('active');
+      showToast('載入成功');
+    } catch (e) {
+      loadErr.textContent = '載入失敗：' + e.message;
+      loadErr.style.display = '';
+    } finally {
+      btnLoad.disabled = false;
+    }
+  }
+
+  btnLoad.addEventListener('click', doLoad);
+  loadPw.addEventListener('keydown', e => { if (e.key === 'Enter') doLoad(); });
+  loadCode.addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+})();
 
 // ── Collab UI events ──
 document.getElementById('btn-collab').addEventListener('pointerdown', () => {

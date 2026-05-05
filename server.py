@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import os
+import secrets
+import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,10 +14,60 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel
 
 app = FastAPI(title="Brainstorm Collaboration Server")
 ROOT_DIR = Path(__file__).resolve().parent
 INDEX_FILE = ROOT_DIR / "index.html"
+
+# ── SQLite project storage ────────────────────────────────────────────────────
+_DB_PATH = os.environ.get("SQLITE_DB_PATH", str(ROOT_DIR / "brainstorm.db"))
+SQLITE_ENABLED = False
+
+def _db():
+    return sqlite3.connect(_DB_PATH)
+
+try:
+    with _db() as _c:
+        _c.execute("""
+            CREATE TABLE IF NOT EXISTS projects (
+                code          TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                state         TEXT NOT NULL,
+                created_at    TEXT DEFAULT (datetime('now')),
+                updated_at    TEXT DEFAULT (datetime('now'))
+            )
+        """)
+    SQLITE_ENABLED = True
+except Exception:
+    SQLITE_ENABLED = False
+
+
+def _hash_pw(password: str) -> str:
+    salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260_000).hex()
+    return f"{salt}:{h}"
+
+
+def _verify_pw(password: str, stored: str) -> bool:
+    try:
+        salt, h = stored.split(":", 1)
+        return hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260_000).hex() == h
+    except Exception:
+        return False
+
+
+def _gen_code() -> str:
+    return secrets.token_hex(3).upper()  # e.g. "A3F9B2"
+
+
+class _SaveBody(BaseModel):
+    password: str
+    state: str
+
+
+class _LoadBody(BaseModel):
+    password: str
 
 # Optional for local front-end testing across origins.
 app.add_middleware(
@@ -180,6 +234,65 @@ async def broadcast_to_room(
         if roles is not None and client.role not in roles:
             continue
         await send_json_safe(client.ws, payload)
+
+
+@app.get("/api/storage-info")
+def api_storage_info():
+    return {"available": SQLITE_ENABLED}
+
+
+@app.post("/api/projects")
+def api_create_project(body: _SaveBody):
+    if not SQLITE_ENABLED:
+        raise HTTPException(503, "Storage not available")
+    code = _gen_code()
+    for _ in range(10):
+        with _db() as c:
+            exists = c.execute("SELECT 1 FROM projects WHERE code=?", (code,)).fetchone()
+        if not exists:
+            break
+        code = _gen_code()
+    with _db() as c:
+        c.execute(
+            "INSERT INTO projects (code, password_hash, state) VALUES (?, ?, ?)",
+            (code, _hash_pw(body.password), body.state),
+        )
+    return {"code": code}
+
+
+@app.post("/api/projects/{code}/load")
+def api_load_project(code: str, body: _LoadBody):
+    if not SQLITE_ENABLED:
+        raise HTTPException(503, "Storage not available")
+    with _db() as c:
+        row = c.execute(
+            "SELECT password_hash, state FROM projects WHERE code=?", (code.upper(),)
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "Project not found")
+    if not _verify_pw(body.password, row[0]):
+        raise HTTPException(401, "Wrong password")
+    return {"state": row[1]}
+
+
+@app.put("/api/projects/{code}")
+def api_update_project(code: str, body: _SaveBody):
+    if not SQLITE_ENABLED:
+        raise HTTPException(503, "Storage not available")
+    with _db() as c:
+        row = c.execute(
+            "SELECT password_hash FROM projects WHERE code=?", (code.upper(),)
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "Project not found")
+    if not _verify_pw(body.password, row[0]):
+        raise HTTPException(401, "Wrong password")
+    with _db() as c:
+        c.execute(
+            "UPDATE projects SET state=?, updated_at=datetime('now') WHERE code=?",
+            (body.state, code.upper()),
+        )
+    return {"ok": True}
 
 
 @app.websocket("/ws/collab")
