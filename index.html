@@ -1416,6 +1416,7 @@ function attachNodeEvents(el, n) {
       return;
     }
     if (connectingFrom) { cancelConnecting(); return; }
+    if (wasPinching || activePointers.size >= 1) return;
 
     el.style.zIndex = '10';
     el.setPointerCapture(e.pointerId);
@@ -1431,6 +1432,13 @@ function attachNodeEvents(el, n) {
   });
 
   function onMove(e) {
+    if (wasPinching || activePointers.size >= 2) {
+      if (dragging) { dragging = false; el.style.zIndex = ''; }
+      el.releasePointerCapture(e.pointerId);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      return;
+    }
     const dx = (e.clientX - dragStartX) / vscale;
     const dy = (e.clientY - dragStartY) / vscale;
     if (!dragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
@@ -1938,7 +1946,10 @@ function attachDragEvents(el, item, handleEl) {
   if (!handleEl) handleEl = el;
   let dragging = false, dragStartX, dragStartY, origX, origY;
   handleEl.addEventListener('pointerdown', e => {
+    activePointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    if (activePointers.size >= 2) wasPinching = true;
     e.stopPropagation();
+    if (wasPinching) return;
     el.style.zIndex = '5';
     el.setPointerCapture(e.pointerId);
     dragStartX = e.clientX; dragStartY = e.clientY;
@@ -1948,6 +1959,13 @@ function attachDragEvents(el, item, handleEl) {
     el.addEventListener('pointerup', onUp);
   });
   function onMove(e) {
+    if (wasPinching || activePointers.size >= 2) {
+      if (dragging) { dragging = false; el.style.zIndex = ''; }
+      el.releasePointerCapture(e.pointerId);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      return;
+    }
     const dx = (e.clientX - dragStartX) / vscale;
     const dy = (e.clientY - dragStartY) / vscale;
     if (!dragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) dragging = true;
