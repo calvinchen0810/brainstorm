@@ -226,11 +226,13 @@
     cursor: grab;
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
     transform-origin: center center;
+    z-index: 2;
   }
   .node:active { cursor: grabbing; }
   .node.selected {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent), var(--node-shadow), 0 0 20px rgba(0,229,255,0.15);
+    z-index: 10;
   }
   .node.connecting-source {
     border-color: var(--accent2);
@@ -370,9 +372,10 @@
     box-shadow: var(--node-shadow);
     cursor: default;
     transition: border-color 0.15s;
+    z-index: 1;
   }
   .sticky:active { cursor: grabbing; }
-  .sticky.selected { border-color: #ffdd00; box-shadow: 0 0 0 1px #ffdd00, var(--node-shadow); }
+  .sticky.selected { border-color: #ffdd00; box-shadow: 0 0 0 1px #ffdd00, var(--node-shadow); z-index: 5; }
 
   .sticky-header {
     display: flex;
@@ -1414,6 +1417,7 @@ function attachNodeEvents(el, n) {
     }
     if (connectingFrom) { cancelConnecting(); return; }
 
+    el.style.zIndex = '10';
     el.setPointerCapture(e.pointerId);
     dragStartX = e.clientX; dragStartY = e.clientY;
     origX = n.x; origY = n.y;
@@ -1469,8 +1473,9 @@ function attachNodeEvents(el, n) {
     el.removeEventListener('pointermove', onMove);
     el.removeEventListener('pointerup', onUp);
     clearTimeout(longPressTimer);
-    if (dragging) { dragging = false; snapshot(); return; }
+    if (dragging) { dragging = false; el.style.zIndex = ''; snapshot(); return; }
     // tap
+    el.style.zIndex = '';
     if (Date.now() - pointerDownTime < 300) {
       if (groupMoveMode) toggleNodeSelection(n.id);
       else selectNode(n.id);
@@ -1934,6 +1939,7 @@ function attachDragEvents(el, item, handleEl) {
   let dragging = false, dragStartX, dragStartY, origX, origY;
   handleEl.addEventListener('pointerdown', e => {
     e.stopPropagation();
+    el.style.zIndex = '5';
     el.setPointerCapture(e.pointerId);
     dragStartX = e.clientX; dragStartY = e.clientY;
     origX = item.x; origY = item.y;
@@ -1955,6 +1961,7 @@ function attachDragEvents(el, item, handleEl) {
   function onUp() {
     el.removeEventListener('pointermove', onMove);
     el.removeEventListener('pointerup', onUp);
+    el.style.zIndex = '';
     if (dragging) { dragging = false; snapshot(); }
   }
 }
