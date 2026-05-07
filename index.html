@@ -921,7 +921,8 @@
     position: fixed;
     top: calc(var(--toolbar-h) + 12px);
     right: 12px;
-    width: 260px;
+    width: 320px;
+    max-width: calc(100vw - 24px);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -943,21 +944,30 @@
   }
   .cloud-tabs {
     display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--border);
+    background: rgba(232,234,238,0.45);
   }
   .cloud-tab {
-    flex: 1;
-    padding: 8px;
+    flex: 1 1 calc(33.333% - 4px);
+    min-width: 88px;
+    padding: 8px 10px;
     font-family: var(--font-mono);
     font-size: 11px;
-    background: none;
-    border: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
     cursor: pointer;
     color: var(--text-dim);
-    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
   }
-  .cloud-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .cloud-tab:hover { border-color: var(--border-active); color: var(--text); }
+  .cloud-tab.active { color: #fff; background: var(--accent); border-color: var(--accent); }
   .cloud-body { padding: 12px 14px; }
+  .cloud-section { display: none; }
+  .cloud-section.active { display: block; }
   .cloud-body p { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.5; }
   .cloud-row { display: flex; gap: 6px; margin-bottom: 8px; }
   .cloud-input {
@@ -991,6 +1001,7 @@
   .cloud-btn:hover { background: var(--surface2); border-color: var(--border-active); }
   .cloud-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .cloud-btn.primary:hover { opacity: 0.9; }
+  .cloud-btn:disabled { opacity: 0.6; cursor: default; }
   .cloud-code-display {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -1004,9 +1015,102 @@
     color: var(--accent);
     margin-bottom: 8px;
   }
+  .cloud-code-display.compact {
+    font-size: 14px;
+    margin-bottom: 0;
+    padding: 8px 10px;
+    letter-spacing: 0.12em;
+  }
   .cloud-msg { font-size: 11px; color: var(--text-dim); text-align: center; margin-bottom: 8px; }
   .cloud-msg.error { color: var(--accent3); }
   .cloud-msg.warn { color: #f0a500; }
+  .cloud-subtitle {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .cloud-current,
+  .cloud-result-card,
+  .cloud-recent-item,
+  .cloud-empty,
+  .cloud-selection {
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(232,234,238,0.55));
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .cloud-current-meta,
+  .cloud-recent-meta {
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .cloud-selection {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: left;
+  }
+  .cloud-selection strong { color: var(--accent); }
+  .cloud-recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+  .cloud-recent-item { margin-bottom: 0; }
+  .cloud-recent-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .cloud-recent-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .cloud-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(0,119,204,0.1);
+    color: var(--accent);
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .cloud-recent-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .cloud-recent-actions .cloud-btn { flex: 1; }
+  .cloud-btn.danger {
+    color: var(--accent3);
+    border-color: rgba(213, 57, 57, 0.45);
+    background: rgba(255, 255, 255, 0.9);
+  }
+  .cloud-btn.danger:hover {
+    background: rgba(213, 57, 57, 0.08);
+    border-color: rgba(213, 57, 57, 0.75);
+  }
+  .cloud-label-row {
+    margin-bottom: 8px;
+  }
+  .cloud-label-row .cloud-subtitle {
+    margin-bottom: 4px;
+  }
+  .cloud-result-card .cloud-row:last-child,
+  .cloud-section .cloud-row:last-child { margin-bottom: 0; }
 
 </style>
 </head>
@@ -1063,9 +1167,9 @@
       <button class="group-pill-btn" id="btn-group-select-all" title="全選節點">全選</button>
       <button class="group-pill-btn" id="btn-group-clear" title="清除節點選取">清除</button>
     </div>
-    <button class="tb-btn" id="btn-save" title="存檔至本機">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      <span class="label">存檔</span>
+      <button class="tb-btn" id="btn-save" title="下載到本機">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="label">下載</span>
     </button>
     <button class="tb-btn" id="btn-export-png" title="匯出透明 PNG（節點與連線）">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1255,44 +1359,63 @@
 
 <!-- Cloud save panel -->
 <div id="cloud-panel">
-  <div class="cloud-header">☁ 雲端儲存</div>
+  <div class="cloud-header">☁ 雲端專案</div>
   <div class="cloud-tabs">
-    <button class="cloud-tab active" id="cloud-tab-save">儲存</button>
-    <button class="cloud-tab" id="cloud-tab-load">載入</button>
+    <button class="cloud-tab" id="cloud-nav-recent" data-section="recent">最近專案</button>
+    <button class="cloud-tab active" id="cloud-nav-save" data-section="save">儲存專案</button>
+    <button class="cloud-tab" id="cloud-nav-open" data-section="open">開啟專案</button>
   </div>
-  <!-- Save view -->
-  <div class="cloud-body" id="cloud-save-view">
-    <p>設定密碼後儲存目前畫布，取得六碼代碼以供日後載入。</p>
+  <div class="cloud-body cloud-section active" id="cloud-section-save">
+    <p>設定一次密碼即可儲存目前畫布。儲存後會提供分享連結與備用代碼。</p>
+    <div class="cloud-current" id="cloud-current-project" style="display:none">
+      <div class="cloud-subtitle">目前連結專案</div>
+      <div class="cloud-row">
+        <div class="cloud-code-display compact" id="cloud-current-code" style="flex:1"></div>
+      </div>
+      <div class="cloud-current-meta" id="cloud-current-meta"></div>
+    </div>
+    <div class="cloud-label-row">
+      <div class="cloud-subtitle">專案名稱（選填）</div>
+      <input class="cloud-input" id="cloud-project-label" type="text" placeholder="例如：五月策略草圖">
+    </div>
     <div class="cloud-row">
       <input class="cloud-input" id="cloud-save-pw" type="password" placeholder="設定密碼">
     </div>
-    <div id="cloud-save-update-row" class="cloud-row" style="display:none">
-      <input class="cloud-input" id="cloud-save-code-input" placeholder="代碼" maxlength="6" style="text-transform:uppercase;width:90px;flex:none">
-      <button class="cloud-btn" id="cloud-btn-update" style="flex:1">覆寫更新</button>
-    </div>
     <div class="cloud-row">
-      <button class="cloud-btn primary" id="cloud-btn-save" style="flex:1">儲存新版本</button>
+      <button class="cloud-btn" id="cloud-btn-save" style="flex:1">儲存新專案</button>
+      <button class="cloud-btn primary" id="cloud-btn-update" style="flex:1;display:none">更新目前專案</button>
     </div>
-    <div id="cloud-save-result" style="display:none">
-      <div class="cloud-code-display" id="cloud-code-out"></div>
-      <div class="cloud-msg">請複製代碼以便日後載入</div>
+    <div class="cloud-result-card" id="cloud-save-result" style="display:none">
+      <div class="cloud-subtitle">分享連結</div>
       <div class="cloud-row">
-        <button class="cloud-btn primary" id="cloud-btn-copy-code" style="flex:1">複製代碼</button>
+        <input class="cloud-input" id="cloud-link-out" readonly>
       </div>
+      <div class="cloud-row">
+        <button class="cloud-btn primary" id="cloud-btn-copy-link" style="flex:1">複製連結</button>
+        <button class="cloud-btn" id="cloud-btn-copy-code" style="flex:1">複製代碼</button>
+      </div>
+      <div class="cloud-subtitle">備用代碼</div>
+      <div class="cloud-code-display compact" id="cloud-code-out"></div>
+      <div class="cloud-msg">此專案已加入這台裝置的最近專案。</div>
     </div>
     <div class="cloud-msg error" id="cloud-save-err" style="display:none"></div>
   </div>
-  <!-- Load view -->
-  <div class="cloud-body" id="cloud-load-view" style="display:none">
-    <p>輸入代碼與密碼以載入雲端專案（將覆蓋目前畫布）。</p>
+  <div class="cloud-body cloud-section" id="cloud-section-recent">
+    <p>這台裝置會記住最近開啟的雲端專案，方便下次直接接續。</p>
+    <div class="cloud-empty" id="cloud-recent-empty">這台裝置還沒有最近的雲端專案。先儲存目前畫布，或使用分享連結 / 六碼代碼開啟。</div>
+    <div class="cloud-recent-list" id="cloud-recent-list"></div>
+  </div>
+  <div class="cloud-body cloud-section" id="cloud-section-open">
+    <p>貼上分享連結或輸入六碼代碼，再輸入密碼即可開啟。</p>
     <div class="cloud-row">
-      <input class="cloud-input" id="cloud-load-code" placeholder="六碼代碼" maxlength="6" style="text-transform:uppercase">
+      <input class="cloud-input" id="cloud-open-entry" placeholder="貼上分享連結或輸入六碼代碼">
     </div>
+    <div class="cloud-selection" id="cloud-open-selection" style="display:none">已識別專案代碼 <strong id="cloud-open-code"></strong></div>
     <div class="cloud-row">
       <input class="cloud-input" id="cloud-load-pw" type="password" placeholder="密碼">
     </div>
     <div class="cloud-row">
-      <button class="cloud-btn primary" id="cloud-btn-load" style="flex:1">載入</button>
+      <button class="cloud-btn primary" id="cloud-btn-load" style="flex:1">開啟專案</button>
     </div>
     <div class="cloud-msg error" id="cloud-load-err" style="display:none"></div>
   </div>
@@ -3698,52 +3821,384 @@ function collabBroadcast() {
 (function () {
   const btnCloud   = document.getElementById('btn-cloud');
   const cloudPanel = document.getElementById('cloud-panel');
-  const saveView   = document.getElementById('cloud-save-view');
-  const loadView   = document.getElementById('cloud-load-view');
-  const tabSave    = document.getElementById('cloud-tab-save');
-  const tabLoad    = document.getElementById('cloud-tab-load');
+  const navButtons = Array.from(document.querySelectorAll('#cloud-panel .cloud-tab'));
+  const sections   = Array.from(document.querySelectorAll('#cloud-panel .cloud-section'));
+  const projectLabelInput = document.getElementById('cloud-project-label');
   const savePw     = document.getElementById('cloud-save-pw');
   const saveErr    = document.getElementById('cloud-save-err');
   const saveResult = document.getElementById('cloud-save-result');
+  const linkOut    = document.getElementById('cloud-link-out');
   const codeOut    = document.getElementById('cloud-code-out');
-  const updateRow  = document.getElementById('cloud-save-update-row');
-  const codeInput  = document.getElementById('cloud-save-code-input');
+  const currentCard = document.getElementById('cloud-current-project');
+  const currentCode = document.getElementById('cloud-current-code');
+  const currentMeta = document.getElementById('cloud-current-meta');
   const btnSave    = document.getElementById('cloud-btn-save');
   const btnUpdate  = document.getElementById('cloud-btn-update');
-  const btnCopy    = document.getElementById('cloud-btn-copy-code');
-  const loadCode   = document.getElementById('cloud-load-code');
+  const btnCopyLink = document.getElementById('cloud-btn-copy-link');
+  const btnCopyCode = document.getElementById('cloud-btn-copy-code');
+  const recentList = document.getElementById('cloud-recent-list');
+  const recentEmpty = document.getElementById('cloud-recent-empty');
+  const openEntry  = document.getElementById('cloud-open-entry');
+  const openSelection = document.getElementById('cloud-open-selection');
+  const openCodeOut = document.getElementById('cloud-open-code');
   const loadPw     = document.getElementById('cloud-load-pw');
   const loadErr    = document.getElementById('cloud-load-err');
   const btnLoad    = document.getElementById('cloud-btn-load');
+  const CLOUD_RECENTS_KEY = 'bst_cloud_recent_projects';
+  const CLOUD_CURRENT_KEY = 'bst_cloud_current_project';
+  const CLOUD_PASSWORD_KEY = 'bst_cloud_password';
+  const CLOUD_URL_PARAM = 'project';
+  const CLOUD_RECENTS_LIMIT = 8;
 
-  // Check server capability
-  fetch('/api/storage-info').then(r => r.json()).then(d => {
-    if (d.available) btnCloud.style.display = '';
-  }).catch(() => {});
-
-  function switchTab(tab) {
-    tabSave.classList.toggle('active', tab === 'save');
-    tabLoad.classList.toggle('active', tab === 'load');
-    saveView.style.display = tab === 'save' ? '' : 'none';
-    loadView.style.display = tab === 'load' ? '' : 'none';
-  }
-  tabSave.addEventListener('click', () => switchTab('save'));
-  tabLoad.addEventListener('click', () => switchTab('load'));
-
-  // Restore remembered code
-  function refreshUpdateRow() {
-    const remembered = sessionStorage.getItem('bst_cloud_code');
-    if (remembered) {
-      updateRow.style.display = '';
-      codeInput.value = remembered;
-    } else {
-      updateRow.style.display = 'none';
+  function readJson(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch {
+      return fallback;
     }
   }
 
+  function writeJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function readRememberedPassword() {
+    return localStorage.getItem(CLOUD_PASSWORD_KEY) || '';
+  }
+
+  function rememberPassword(password) {
+    const value = String(password || '').trim();
+    if (!value) return '';
+    localStorage.setItem(CLOUD_PASSWORD_KEY, value);
+    return value;
+  }
+
+  function syncPasswordInputs(password) {
+    const value = String(password || '');
+    if (savePw && !savePw.matches(':focus')) savePw.value = value;
+    if (loadPw && !loadPw.matches(':focus')) loadPw.value = value;
+  }
+
+  function resolvePassword(inputEl) {
+    const typed = String(inputEl?.value || '').trim();
+    if (typed) {
+      const remembered = rememberPassword(typed);
+      syncPasswordInputs(remembered);
+      return remembered;
+    }
+    const remembered = readRememberedPassword();
+    if (remembered) {
+      syncPasswordInputs(remembered);
+      return remembered;
+    }
+    return '';
+  }
+
+  function normalizeProjectCode(raw) {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    if (/^[A-F0-9]{6}$/i.test(value)) return value.toUpperCase();
+    try {
+      const parsed = new URL(value, window.location.origin);
+      const candidate = parsed.searchParams.get(CLOUD_URL_PARAM)
+        || parsed.searchParams.get('code')
+        || parsed.searchParams.get('cloud')
+        || parsed.hash.replace(/^#/, '');
+      if (candidate && /^[A-F0-9]{6}$/i.test(candidate)) return candidate.toUpperCase();
+    } catch {}
+    return '';
+  }
+
+  function projectShareLink(code) {
+    const url = new URL(window.location.origin + window.location.pathname);
+    url.searchParams.set(CLOUD_URL_PARAM, code);
+    return url.toString();
+  }
+
+  function sanitizeProjectLabel(value) {
+    return String(value || '').trim().slice(0, 40);
+  }
+
+  function readRecentProjects() {
+    const list = readJson(CLOUD_RECENTS_KEY, []);
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter(item => item && /^[A-F0-9]{6}$/i.test(item.code || ''))
+      .map(item => ({
+        code: String(item.code).toUpperCase(),
+        label: item.label || '',
+        lastOpenedAt: item.lastOpenedAt || '',
+        lastSavedAt: item.lastSavedAt || ''
+      }))
+      .sort((a, b) => (b.lastOpenedAt || b.lastSavedAt || '').localeCompare(a.lastOpenedAt || a.lastSavedAt || ''));
+  }
+
+  function writeRecentProjects(list) {
+    writeJson(CLOUD_RECENTS_KEY, list.slice(0, CLOUD_RECENTS_LIMIT));
+  }
+
+  function getCurrentProject() {
+    const current = readJson(CLOUD_CURRENT_KEY, null);
+    if (!current || !/^[A-F0-9]{6}$/i.test(current.code || '')) return null;
+    return {
+      code: String(current.code).toUpperCase(),
+      label: current.label || '',
+      lastOpenedAt: current.lastOpenedAt || '',
+      lastSavedAt: current.lastSavedAt || ''
+    };
+  }
+
+  function setCurrentProject(project) {
+    if (!project || !project.code) {
+      localStorage.removeItem(CLOUD_CURRENT_KEY);
+      return;
+    }
+    writeJson(CLOUD_CURRENT_KEY, {
+      code: project.code,
+      label: project.label || '',
+      lastOpenedAt: project.lastOpenedAt || '',
+      lastSavedAt: project.lastSavedAt || ''
+    });
+  }
+
+  function rememberProject(code, updates = {}) {
+    const normalized = normalizeProjectCode(code);
+    if (!normalized) return null;
+    const now = new Date().toISOString();
+    const list = readRecentProjects();
+    const previous = list.find(item => item.code === normalized) || {};
+    const hasLabelUpdate = Object.prototype.hasOwnProperty.call(updates, 'label');
+    const nextLabel = hasLabelUpdate
+      ? sanitizeProjectLabel(updates.label)
+      : (previous.label || '');
+    const next = {
+      code: normalized,
+      label: nextLabel,
+      lastOpenedAt: updates.touchOpened === false ? (updates.lastOpenedAt || previous.lastOpenedAt || '') : (updates.lastOpenedAt || now),
+      lastSavedAt: updates.touchSaved ? (updates.lastSavedAt || now) : (updates.lastSavedAt || previous.lastSavedAt || '')
+    };
+    writeRecentProjects([next, ...list.filter(item => item.code !== normalized)]);
+    return next;
+  }
+
+  function deleteRecentProject(code) {
+    const normalized = normalizeProjectCode(code);
+    if (!normalized) return false;
+    const list = readRecentProjects();
+    const next = list.filter(item => item.code !== normalized);
+    if (next.length === list.length) return false;
+    writeRecentProjects(next);
+    const current = getCurrentProject();
+    if (current?.code === normalized) setCurrentProject(null);
+    return true;
+  }
+
+  function formatProjectTime(project) {
+    const ts = project.lastOpenedAt || project.lastSavedAt;
+    if (!ts) return '剛剛';
+    const date = new Date(ts);
+    return Number.isNaN(date.getTime()) ? '剛剛' : date.toLocaleString('zh-TW', { hour12: false });
+  }
+
+  function switchSection(sectionName) {
+    navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.section === sectionName));
+    sections.forEach(section => section.classList.toggle('active', section.id === `cloud-section-${sectionName}`));
+  }
+
+  function renderOpenSelection(code) {
+    if (!code) {
+      openSelection.style.display = 'none';
+      openCodeOut.textContent = '';
+      return;
+    }
+    openSelection.style.display = '';
+    openCodeOut.textContent = code;
+  }
+
+  function renderSaveSection() {
+    const current = getCurrentProject();
+    const hasCurrent = !!current;
+    currentCard.style.display = hasCurrent ? '' : 'none';
+    btnUpdate.style.display = hasCurrent ? '' : 'none';
+    btnSave.classList.toggle('primary', !hasCurrent);
+    btnUpdate.classList.toggle('primary', hasCurrent);
+    if (!hasCurrent) {
+      currentCode.textContent = '';
+      currentMeta.textContent = '';
+      return;
+    }
+    currentCode.textContent = current.code;
+    currentMeta.textContent = current.label
+      ? `名稱「${current.label}」 · 最近開啟 ${formatProjectTime(current)}。更新目前畫布時只需要再輸入一次密碼。`
+      : `最近開啟 ${formatProjectTime(current)}。更新目前畫布時只需要再輸入一次密碼。`;
+    if (projectLabelInput && !projectLabelInput.matches(':focus')) {
+      projectLabelInput.value = current.label || '';
+    }
+  }
+
+  function showSaveResult(code) {
+    const normalized = normalizeProjectCode(code);
+    if (!normalized) {
+      saveResult.style.display = 'none';
+      return;
+    }
+    codeOut.textContent = normalized;
+    linkOut.value = projectShareLink(normalized);
+    saveResult.style.display = '';
+  }
+
+  function clearSaveFeedback() {
+    saveErr.style.display = 'none';
+    saveErr.textContent = '';
+  }
+
+  function clearLoadFeedback() {
+    loadErr.style.display = 'none';
+    loadErr.textContent = '';
+  }
+
+  function renderRecents() {
+    const current = getCurrentProject();
+    const recents = readRecentProjects();
+    recentList.innerHTML = '';
+    recentEmpty.style.display = recents.length ? 'none' : '';
+    recents.forEach(project => {
+      const item = document.createElement('div');
+      item.className = 'cloud-recent-item';
+
+      const top = document.createElement('div');
+      top.className = 'cloud-recent-top';
+
+      const title = document.createElement('div');
+      title.className = 'cloud-recent-title';
+      title.textContent = project.label || `雲端專案 ${project.code}`;
+      top.appendChild(title);
+
+      if (current?.code === project.code) {
+        const pill = document.createElement('div');
+        pill.className = 'cloud-pill';
+        pill.textContent = '目前專案';
+        top.appendChild(pill);
+      }
+
+      item.appendChild(top);
+
+      const meta = document.createElement('div');
+      meta.className = 'cloud-recent-meta';
+      meta.textContent = `代碼 ${project.code} · 最近使用 ${formatProjectTime(project)}`;
+      item.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'cloud-recent-actions';
+
+      const openBtn = document.createElement('button');
+      openBtn.className = 'cloud-btn primary';
+      openBtn.type = 'button';
+      openBtn.textContent = '開啟';
+      openBtn.addEventListener('click', () => {
+        openEntry.value = project.code;
+        renderOpenSelection(project.code);
+        clearLoadFeedback();
+        switchSection('open');
+        requestAnimationFrame(() => loadPw.focus());
+      });
+      actions.appendChild(openBtn);
+
+      if (current?.code === project.code) {
+        const updateBtn = document.createElement('button');
+        updateBtn.className = 'cloud-btn';
+        updateBtn.type = 'button';
+        updateBtn.textContent = '更新目前畫布';
+        updateBtn.addEventListener('click', () => {
+          clearSaveFeedback();
+          switchSection('save');
+          requestAnimationFrame(() => savePw.focus());
+        });
+        actions.appendChild(updateBtn);
+      }
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'cloud-btn danger';
+      deleteBtn.type = 'button';
+      deleteBtn.textContent = '刪除';
+      deleteBtn.addEventListener('click', () => {
+        if (!deleteRecentProject(project.code)) return;
+        if (normalizeProjectCode(openEntry.value) === project.code) {
+          openEntry.value = '';
+          renderOpenSelection('');
+        }
+        syncCloudUI();
+        showToast('已刪除最近專案');
+      });
+      actions.appendChild(deleteBtn);
+
+      item.appendChild(actions);
+      recentList.appendChild(item);
+    });
+  }
+
+  function syncCloudUI() {
+    renderSaveSection();
+    renderRecents();
+    renderOpenSelection(normalizeProjectCode(openEntry.value));
+  }
+
+  function preferredSection() {
+    const codeFromUrl = normalizeProjectCode(new URL(window.location.href).searchParams.get(CLOUD_URL_PARAM));
+    if (codeFromUrl) return 'open';
+    return readRecentProjects().length ? 'recent' : 'save';
+  }
+
+  function openCloudPanel(sectionName) {
+    const codeFromUrl = normalizeProjectCode(new URL(window.location.href).searchParams.get(CLOUD_URL_PARAM));
+    if (codeFromUrl && !normalizeProjectCode(openEntry.value)) openEntry.value = codeFromUrl;
+    syncPasswordInputs(readRememberedPassword());
+    clearSaveFeedback();
+    clearLoadFeedback();
+    syncCloudUI();
+    cloudPanel.classList.add('active');
+    switchSection(sectionName || preferredSection());
+  }
+
+  async function copyText(text, successMessage) {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(successMessage);
+    } catch {
+      showToast('複製失敗');
+    }
+  }
+
+  // Check server capability
+  fetch('api/storage-info').then(r => r.json()).then(d => {
+    if (!d.available) return;
+    btnCloud.style.display = '';
+    const codeFromUrl = normalizeProjectCode(new URL(window.location.href).searchParams.get(CLOUD_URL_PARAM));
+    const legacyCode = normalizeProjectCode(sessionStorage.getItem('bst_cloud_code'));
+    if (legacyCode) {
+      const remembered = rememberProject(legacyCode, { touchOpened: true });
+      setCurrentProject(remembered);
+      sessionStorage.removeItem('bst_cloud_code');
+    }
+    if (codeFromUrl) openCloudPanel('open');
+  }).catch(() => {});
+
+  navButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      clearSaveFeedback();
+      clearLoadFeedback();
+      switchSection(btn.dataset.section);
+    });
+  });
+
   btnCloud.addEventListener('pointerdown', () => {
-    const isOpen = cloudPanel.classList.toggle('active');
-    if (isOpen) { switchTab('save'); refreshUpdateRow(); saveErr.style.display = 'none'; saveResult.style.display = 'none'; }
+    if (cloudPanel.classList.contains('active')) {
+      cloudPanel.classList.remove('active');
+      return;
+    }
+    openCloudPanel();
   });
 
   document.addEventListener('pointerdown', e => {
@@ -3761,23 +4216,24 @@ function collabBroadcast() {
   }
 
   async function doSave() {
-    const pw = savePw.value.trim();
+    const pw = resolvePassword(savePw);
+    const label = sanitizeProjectLabel(projectLabelInput?.value);
     if (!pw) { saveErr.textContent = '請輸入密碼'; saveErr.style.display = ''; return; }
-    saveErr.style.display = 'none';
+    clearSaveFeedback();
     btnSave.disabled = true;
     try {
-      const r = await fetch('/api/projects', {
+      const r = await fetch('api/projects', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({password: pw, state: currentState()})
       });
       if (!r.ok) throw new Error((await r.json()).detail || r.status);
       const {code} = await r.json();
-      sessionStorage.setItem('bst_cloud_code', code);
-      codeOut.textContent = code;
-      saveResult.style.display = '';
-      refreshUpdateRow();
-      savePw.value = '';
+      const remembered = rememberProject(code, { touchOpened: true, touchSaved: true, label });
+      setCurrentProject(remembered);
+      showSaveResult(code);
+      syncCloudUI();
+      showToast('已儲存到雲端');
     } catch (e) {
       saveErr.textContent = '儲存失敗：' + e.message;
       saveErr.style.display = '';
@@ -3787,22 +4243,24 @@ function collabBroadcast() {
   }
 
   async function doUpdate() {
-    const pw = savePw.value.trim();
-    const code = codeInput.value.trim().toUpperCase();
+    const pw = resolvePassword(savePw);
+    const label = sanitizeProjectLabel(projectLabelInput?.value);
+    const current = getCurrentProject();
     if (!pw) { saveErr.textContent = '請輸入密碼'; saveErr.style.display = ''; return; }
-    if (!code) { saveErr.textContent = '請輸入代碼'; saveErr.style.display = ''; return; }
-    saveErr.style.display = 'none';
+    if (!current?.code) { saveErr.textContent = '目前沒有可更新的雲端專案'; saveErr.style.display = ''; return; }
+    clearSaveFeedback();
     btnUpdate.disabled = true;
     try {
-      const r = await fetch(`/api/projects/${code}`, {
+      const r = await fetch(`api/projects/${current.code}`, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({password: pw, state: currentState()})
       });
       if (!r.ok) throw new Error((await r.json()).detail || r.status);
-      codeOut.textContent = code;
-      saveResult.style.display = '';
-      savePw.value = '';
+      const remembered = rememberProject(current.code, { touchOpened: true, touchSaved: true, label });
+      setCurrentProject(remembered);
+      showSaveResult(current.code);
+      syncCloudUI();
       showToast('已覆寫更新');
     } catch (e) {
       const msg = e.message;
@@ -3815,21 +4273,20 @@ function collabBroadcast() {
 
   btnSave.addEventListener('click', doSave);
   btnUpdate.addEventListener('click', doUpdate);
-  savePw.addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
+  savePw.addEventListener('keydown', e => { if (e.key === 'Enter') { if (getCurrentProject()) doUpdate(); else doSave(); } });
 
-  btnCopy.addEventListener('click', () => {
-    navigator.clipboard.writeText(codeOut.textContent).then(() => showToast('代碼已複製'));
-  });
+  btnCopyLink.addEventListener('click', () => copyText(linkOut.value, '連結已複製'));
+  btnCopyCode.addEventListener('click', () => copyText(codeOut.textContent, '代碼已複製'));
 
   async function doLoad() {
-    const code = loadCode.value.trim().toUpperCase();
-    const pw   = loadPw.value.trim();
-    if (!code) { loadErr.textContent = '請輸入代碼'; loadErr.style.display = ''; return; }
+    const code = normalizeProjectCode(openEntry.value);
+    const pw   = resolvePassword(loadPw);
+    if (!code) { loadErr.textContent = '請貼上分享連結或輸入六碼代碼'; loadErr.style.display = ''; return; }
     if (!pw)   { loadErr.textContent = '請輸入密碼'; loadErr.style.display = ''; return; }
-    loadErr.style.display = 'none';
+    clearLoadFeedback();
     btnLoad.disabled = true;
     try {
-      const r = await fetch(`/api/projects/${code}/load`, {
+      const r = await fetch(`api/projects/${code}/load`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({password: pw})
@@ -3840,7 +4297,11 @@ function collabBroadcast() {
       }
       const {state: loaded} = await r.json();
       collabApplyState(loaded);
-      sessionStorage.setItem('bst_cloud_code', code);
+      const remembered = rememberProject(code, { touchOpened: true });
+      setCurrentProject(remembered);
+      openEntry.value = code;
+      renderOpenSelection(code);
+      syncCloudUI();
       cloudPanel.classList.remove('active');
       showToast('載入成功');
     } catch (e) {
@@ -3853,7 +4314,18 @@ function collabBroadcast() {
 
   btnLoad.addEventListener('click', doLoad);
   loadPw.addEventListener('keydown', e => { if (e.key === 'Enter') doLoad(); });
-  loadCode.addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+  openEntry.addEventListener('input', e => {
+    const value = e.target.value.trim();
+    if (/^[A-F0-9]{0,6}$/i.test(value)) e.target.value = value.toUpperCase();
+    renderOpenSelection(normalizeProjectCode(e.target.value));
+  });
+  openEntry.addEventListener('blur', () => {
+    const code = normalizeProjectCode(openEntry.value);
+    if (code) openEntry.value = code;
+    renderOpenSelection(code);
+  });
+  syncPasswordInputs(readRememberedPassword());
+  syncCloudUI();
 })();
 
 // ── Collab UI events ──
